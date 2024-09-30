@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Pedido</title>
+</head>
+<body>
+    <h1>Editar Pedido</h1>
+    <form action="{{ url_for('editar_pedido', id=pedido.id) }}" method="POST">
+        <label for="cliente_id">Cliente:</label>
+        <select id="cliente_id" name="cliente_id">
+            {% for cliente in clientes %}
+            <option value="{{ cliente.id }}" {% if cliente.id == pedido.cliente_id %}selected{% endif %}>{{ cliente.nombre_completo }}</option>
+            {% endfor %}
+        </select><br>
+
+        <label for="producto_id">Producto:</label>
+        <select id="producto_id" name="producto_id">
+            {% for producto in productos %}
+            <option value="{{ producto.id }}" {% if producto.id == pedido.producto_id %}selected{% endif %}>{{ producto.nombre }}</option>
+            {% endfor %}
+        </select><br>
+
+        <label for="cantidad">Cantidad:</label>
+        <input type="number" id="cantidad" name="cantidad" value="{{ pedido.cantidad }}" required><br>
+
+        <label for="estado">Estado:</label>
+        <select id="estado" name="estado">
+            <option value="pendiente" {% if pedido.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+            <option value="completado" {% if pedido.estado == 'completado' %}selected{% endif %}>Completado</option>
+        </select><br>
+
+        <button type="submit">Guardar Cambios</button>
+    </form>
+</body>
+</html>

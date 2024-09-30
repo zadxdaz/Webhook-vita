@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuevo Cliente</title>
+</head>
+<body>
+    <h1>Agregar Cliente</h1>
+    <form action="{{ url_for('nuevo_cliente') }}" method="POST">
+        <label for="nombre_completo">Nombre Completo:</label>
+        <input type="text" id="nombre_completo" name="nombre_completo" required><br>
+
+        <label for="celular">Celular:</label>
+        <input type="text" id="celular" name="celular" required><br>
+
+        <label for="direccion">Dirección:</label>
+        <input type="text" id="direccion" name="direccion" required><br>
+
+        <button type="submit">Agregar Cliente</button>
+    </form>
+</body>
+</html>
