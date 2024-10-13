@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Client List - {{ list_name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Client List: {{ list_name }}</h1>
+
+    <!-- Table to display clients in the list -->
+    <table border="1" class="client-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Full Name</th>
+                <th>Phone</th>
+                <th>Address</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for client in clients %}
+            <tr>
+                <td>{{ client.id }}</td>
+                <td>{{ client.nombre_completo }}</td>
+                <td>{{ client.celular }}</td>
+                <td>{{ client.direccion }}</td>
+                <td>
+                    <!-- Link to view client details -->
+                    <a href="{{ url_for('client_messages', whatsapp_id=client.celular) }}">View Messages</a>
+
+                    <!-- Button to remove client from list -->
+                    <form action="{{ url_for('remove_client_from_list', list_id=list_id, client_id=client.id) }}" method="POST" style="display:inline;">
+                        <button type="submit">Remove from List</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5">No clients in this list yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Form to send a mass message to all clients in the list -->
+    <h2>Send Mass Message to Clients in List</h2>
+    <form action="{{ url_for('send_mass_message', list_id=list_id) }}" method="POST">
+        <textarea name="message" rows="5" cols="40" placeholder="Type your message here..." required></textarea><br>
+        <button type="submit">Send Message</button>
+    </form>
+
+</div>
+<style>
+    .container {
+        padding: 20px;
+    }
+
+    h1, h2 {
+        margin-bottom: 20px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+
+    table, th, td {
+        border: 1px solid #ccc;
+    }
+
+    th, td {
+        padding: 10px;
+        text-align: left;
+    }
+
+    th {
+        background-color: #f2f2f2;
+    }
+
+    form {
+        margin-bottom: 20px;
+    }
+
+    textarea {
+        width: 100%;
+    }
+
+    button {
+        padding: 10px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+
+    button:hover {
+        background-color: #0056b3;
+    }
+</style>
+{% endblock %}

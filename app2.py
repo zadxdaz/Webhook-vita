@@ -1,74 +1,91 @@
+import os
 import sqlite3
+from flask import Flask, g, render_template, request, redirect, url_for, abort , jsonify
+from flask_wtf.csrf import CSRFProtect 
+from flask_wtf import FlaskForm
 from objetos2 import *
-from flask import Flask, g , render_template , request , redirect , url_for
+import functools
+from datetime import datetime
+from ClientList import ClientList
+
+
+# Load sensitive data from environment variables
+from dotenv import load_dotenv
+
+load_dotenv()
+KEY = os.getenv("WHATSAPP_API_KEY")
+PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
+WEBHOOK_VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN")
+DATABASE = os.getenv("DATABASE", "vita.db")
 
 app = Flask(__name__)
-KEY = "EAA0yrfyTgOgBO4hDOxhHwWcGUq86GU0hJmzTPR0I07I0klGkFykjYXVjcw2yOwt5ja0QQ3WVmtyPmYsbd1ZCMaruPvjM4QNYhPtwx1aMnbMcJ9JVZBnauxnRVXA8DZCyB0nIrEMUOE3kZCns43JNxMuTZBIfgyzXxLlxCBl3WQjX29V7ZBKUO8qxx9P3mF1Bcs6wZDZD"
-PHONE_NUMBER_ID ="3714897545494760"
-WEBHOOK_VERIFY_TOKEN="ASLDNKFUIOQWHBDFA213fa"
-DATABASE = 'vita.db'
-bot = Bot()
-bot.ACCESS_TOKEN = KEY
+app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY')
+csrf = CSRFProtect(app)
 
+bot = Bot(KEY,PHONE_NUMBER_ID)
 
+# Database connection
 def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
-    return db
+    if 'db' not in g:
+        g.db = sqlite3.connect(DATABASE)
+        g.db.row_factory = sqlite3.Row
+    return g.db
 
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row  # Permite acceder a los datos por nombre de columna
-    return conn
-
+class EmptyForm(FlaskForm):
+    pass
 
 @app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, '_database', None)
+def close_db_connection(exception):
+    db = g.pop('db', None)
     if db is not None:
         db.close()
 
+# Error handler
+def handle_db_error(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except sqlite3.Error as e:
+            print(f"Database error: {e}")
+            return abort(500, description="Internal Server Error")
+    return wrapper
 
-@app.route('/webhook', methods =['POST'])
+# Routes with improvements
+
+@app.route('/webhook', methods=['POST'])
+@csrf.exempt
 def webhook():
     data = request.get_json()
     bot.procesar_mensaje(data)
-    return "Ok" ,200
+    return "Ok", 200
 
 @app.route('/webhook', methods=['GET'])
 def verify_webhook():
-    # Obtiene los parámetros de la solicitud GET
     mode = request.args.get("hub.mode")
     token = request.args.get("hub.verify_token")
     challenge = request.args.get("hub.challenge")
-    
-    # Verifica que el modo y el token son correctos
     if mode == "subscribe" and token == WEBHOOK_VERIFY_TOKEN:
-        # Responde con el challenge token para verificar el webhook
         return challenge, 200
-    else:
-        # Responde con 403 si el token no coincide
-        return "Forbidden", 403
+    return "Forbidden", 403
 
 @app.route('/iniciar_conversacion/<int:id>', methods=['POST'])
+@handle_db_error
 def iniciar_conversacion(id):
-    # Obtener el cliente por su ID
     cliente = Cliente.get_by_id(id)
-
     if cliente:
-        # Enviar un mensaje de saludo con opciones al cliente
         bot.enviar_saludo(cliente)
+    return redirect(url_for('index'), 302)
 
-    return redirect(url_for('index'))
-
-# Ruta para listar todos los clientes
 @app.route('/')
+@handle_db_error
 def index():
-    clientes = Cliente.get_all()  # Obtener todos los clientes a través de la clase Cliente
-    return render_template('index.html', clientes=clientes)
-# Ruta para crear un nuevo cliente (GET para mostrar el formulario, POST para procesar la data)
+    clientes = Cliente.get_all()
+    form = EmptyForm()
+    return render_template('index.html', clientes=clientes,  form=form), 200
+
 @app.route('/nuevo_cliente', methods=['GET', 'POST'])
+@handle_db_error
 def nuevo_cliente():
     if request.method == 'POST':
         nombre = request.form['nombre_completo']
@@ -76,15 +93,14 @@ def nuevo_cliente():
         direccion = request.form['direccion']
 
         cliente = Cliente(nombre_completo=nombre, celular=celular, direccion=direccion)
-        cliente.save()  # Usar el método save() para guardar el cliente en la base de datos
-        return redirect(url_for('index'))
-    return render_template('nuevo_cliente.html')
+        cliente.save()
+        return redirect(url_for('index'), 302)
+    return render_template('nuevo_cliente.html'), 200
 
-# Ruta para editar un cliente
 @app.route('/editar_cliente/<int:id>', methods=['GET', 'POST'])
+@handle_db_error
 def editar_cliente(id):
-    cliente = Cliente.get_by_id(id)  # Obtener el cliente por su ID
-
+    cliente = Cliente.get_by_id(id)
     if request.method == 'POST':
         nombre = request.form['nombre_completo']
         celular = request.form['celular']
@@ -93,27 +109,27 @@ def editar_cliente(id):
         cliente.nombre_completo = nombre
         cliente.celular = celular
         cliente.direccion = direccion
-        cliente.save()  # Actualizar el cliente usando el método save()
-        return redirect(url_for('index'))
+        cliente.save()
+        return redirect(url_for('index'), 302)
 
-    return render_template('editar_cliente.html', cliente=cliente)
+    return render_template('editar_cliente.html', cliente=cliente), 200
 
-# Ruta para eliminar un cliente
 @app.route('/eliminar_cliente/<int:id>', methods=['POST'])
+@handle_db_error
 def eliminar_cliente(id):
     cliente = Cliente.get_by_id(id)
     if cliente:
-        cliente.delete()  # Eliminar el cliente usando el método delete()
-    return redirect(url_for('index'))
+        cliente.delete()
+    return redirect(url_for('index'), 302)
 
-# Ruta para listar todos los productos
 @app.route('/productos')
+@handle_db_error
 def productos():
     productos = Producto.get_all()
-    return render_template('productos.html', productos=productos)
+    return render_template('productos.html', productos=productos), 200
 
-# Ruta para crear un nuevo producto (GET para mostrar el formulario, POST para procesar la data)
 @app.route('/nuevo_producto', methods=['GET', 'POST'])
+@handle_db_error
 def nuevo_producto():
     if request.method == 'POST':
         nombre = request.form['nombre']
@@ -122,14 +138,13 @@ def nuevo_producto():
 
         producto = Producto(nombre=nombre, descripcion=descripcion, precio=precio)
         producto.save()
-        return redirect(url_for('productos'))
-    return render_template('nuevo_producto.html')
+        return redirect(url_for('productos'), 302)
+    return render_template('nuevo_producto.html'), 200
 
-# Ruta para editar un producto
 @app.route('/editar_producto/<int:id>', methods=['GET', 'POST'])
+@handle_db_error
 def editar_producto(id):
     producto = Producto.get_by_id(id)
-
     if request.method == 'POST':
         nombre = request.form['nombre']
         descripcion = request.form['descripcion']
@@ -139,26 +154,26 @@ def editar_producto(id):
         producto.descripcion = descripcion
         producto.precio = precio
         producto.save()
-        return redirect(url_for('productos'))
+        return redirect(url_for('productos'), 302)
 
-    return render_template('editar_producto.html', producto=producto)
+    return render_template('editar_producto.html', producto=producto), 200
 
-# Ruta para eliminar un producto
 @app.route('/eliminar_producto/<int:id>', methods=['POST'])
+@handle_db_error
 def eliminar_producto(id):
     producto = Producto.get_by_id(id)
     if producto:
         producto.delete()
-    return redirect(url_for('productos'))
+    return redirect(url_for('productos'), 302)
 
-# Ruta para listar todos los pedidos
 @app.route('/pedidos')
+@handle_db_error
 def pedidos():
     pedidos = Pedido.get_vista()
-    return render_template('pedidos.html', pedidos=pedidos)
+    return render_template('pedidos.html', pedidos=pedidos), 200
 
-# Ruta para crear un nuevo pedido (GET para mostrar el formulario, POST para procesar la data)
 @app.route('/nuevo_pedido', methods=['GET', 'POST'])
+@handle_db_error
 def nuevo_pedido():
     clientes = Cliente.get_all()
     productos = Producto.get_all()
@@ -171,11 +186,11 @@ def nuevo_pedido():
 
         pedido = Pedido(cliente_id=cliente_id, producto_id=producto_id, cantidad=cantidad, estado=estado)
         pedido.save()
-        return redirect(url_for('pedidos'))
-    return render_template('nuevo_pedido.html', clientes=clientes, productos=productos)
+        return redirect(url_for('pedidos'), 302)
+    return render_template('nuevo_pedido.html', clientes=clientes, productos=productos), 200
 
-# Ruta para editar un pedido
 @app.route('/editar_pedido/<int:id>', methods=['GET', 'POST'])
+@handle_db_error
 def editar_pedido(id):
     pedido = Pedido.get_by_id(id)
     clientes = Cliente.get_all()
@@ -192,17 +207,112 @@ def editar_pedido(id):
         pedido.cantidad = cantidad
         pedido.estado = estado
         pedido.save()
-        return redirect(url_for('pedidos'))
+        return redirect(url_for('pedidos'), 302)
 
-    return render_template('editar_pedido.html', pedido=pedido, clientes=clientes, productos=productos)
+    return render_template('editar_pedido.html', pedido=pedido, clientes=clientes, productos=productos), 200
 
-# Ruta para eliminar un pedido
 @app.route('/eliminar_pedido/<int:id>', methods=['POST'])
+@handle_db_error
 def eliminar_pedido(id):
     pedido = Pedido.get_by_id(id)
     if pedido:
         pedido.delete()
-    return redirect(url_for('pedidos'))
+    return redirect(url_for('pedidos'), 302)
+
+@app.route('/client_messages/<whatsapp_id>', methods=['GET'])
+def client_messages(whatsapp_id):
+    conn = Mensaje.get_db_connection()
+    try:
+        # Fetch the client's data based on the whatsapp_id
+        client = Cliente.obtener_por_celular(whatsapp_id)
+    except sqlite3.Error as e:
+        print(f"Error retrieving messages for {whatsapp_id}: {e}")
+        messages = []
+        has_more = False
+        client = None
+    finally:
+        Mensaje.close_connection(conn)
+
+    return render_template('client_messages.html',  
+                           whatsapp_id=whatsapp_id, 
+                           client=client, )
+
+@app.route('/api/messages/<whatsapp_id>', methods=['GET'])
+@csrf.exempt
+def api_client_messages(whatsapp_id):
+    # Get the 'page' query parameter to handle pagination, default to 1 if not provided
+    page = int(request.args.get('page', 1))
+    per_page = 100  # Number of messages to load per page
+    offset = (page - 1) * per_page
+
+    conn = Mensaje.get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Fetch the messages for the specific client
+        cursor.execute('''
+            SELECT * FROM mensajes 
+            WHERE whatsapp_id = ?
+            ORDER BY timestamp ASC
+            LIMIT ? OFFSET ?
+        ''', (whatsapp_id, per_page, offset))
+        messages = cursor.fetchall()
+
+        # Check if there are more messages for pagination
+        cursor.execute('SELECT COUNT(*) FROM mensajes WHERE whatsapp_id = ?', (whatsapp_id,))
+        total_messages = cursor.fetchone()[0]
+        has_more = total_messages > offset + per_page
+        messages_data = [
+            {
+                'id': message['id'],
+                'message': message['message'],
+                'direction': message['direction'],
+                'timestamp': message['timestamp']
+            } for message in messages
+        ]
+    except sqlite3.Error as e:
+        print(f"Error retrieving messages: {e}")
+        return jsonify({"error": "Database error"}), 500
+    finally:
+        Mensaje.close_connection(conn)
+
+    # Return messages in JSON format with pagination info
+    return jsonify({
+        'messages': messages_data,
+        'has_more': has_more,
+        'page': page
+    })
+
+@app.route('/api/send_message/<whatsapp_id>', methods=['POST'])
+@csrf.exempt
+def send_message(whatsapp_id):
+    data = request.get_json()
+    message_text = data.get('message')
+
+    # Simulate sending the message via WhatsApp API (replace with actual API call)
+    # Generate the current timestamp
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    bot.enviar_mensaje(celular=whatsapp_id,mensaje=message_text)
+    # Log the sent message to the database
+
+    # Return the message_id and timestamp in the response
+    return jsonify({"status": "Message sent successfully", "timestamp": timestamp}), 200
+
+@app.route('/reset_conversation/<int:id>', methods=['POST'])
+def reset_conversation(id):
+    # Retrieve the client from the database
+    client = Cliente.get_by_id(id)
+
+    if client:
+        # Reset estado_conversacion and producto_seleccionado to None
+        client.estado_conversacion = None
+        client.producto_seleccionado = None
+        client.save()
+
+    # Redirect back to the client message screen after resetting
+    return redirect(url_for('client_messages', whatsapp_id=client.celular))
+
+
+
 
 
 if __name__ == '__main__':

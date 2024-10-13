@@ -40,6 +40,29 @@ CREATE TABLE IF NOT EXISTS rutas (
     fecha_ruta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (pedido_id) REFERENCES pedidos (id)
 );
+
+CREATE TABLE IF NOT EXISTS mensajes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    whatsapp_id TEXT NOT NULL,
+    message TEXT NOT NULL,
+    direction TEXT NOT NULL, -- 'sent' or 'received'
+    timestamp TEXT NOT NULL,
+    type TEXT NOT NULL -- 'text', 'image', etc.
+);
+
+CREATE TABLE client_lists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE list_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    list_id INTEGER,
+    client_id INTEGER,
+    FOREIGN KEY (list_id) REFERENCES client_lists(id),
+    FOREIGN KEY (client_id) REFERENCES clientes(id)
+);
+
 """
 
 # Función para conectar a la base de datos y ejecutar la query

@@ -1,9 +1,43 @@
 import sqlite3
 import requests
+import time
+
 
 DATABASE = 'vita.db'
 
-class Cliente:
+import sqlite3
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+DATABASE = os.getenv('DATABASE', 'vita.db')
+
+class BaseModel:
+    """Base class for handling database connections and common operations."""
+    
+    @staticmethod
+    def get_db_connection():
+        """Establish a connection to the SQLite database."""
+        try:
+            conn = sqlite3.connect(DATABASE)
+            conn.row_factory = sqlite3.Row
+            return conn
+        except sqlite3.Error as e:
+            print(f"Error connecting to the database: {e}")
+            raise
+
+    @staticmethod
+    def close_connection(conn):
+        """Close the connection to the database."""
+        if conn:
+            try:
+                conn.close()
+            except sqlite3.Error as e:
+                print(f"Error closing the database connection: {e}")
+
+class Cliente(BaseModel):
     def __init__(self, nombre_completo, celular, direccion, id=None, estado_conversacion=None, producto_seleccionado=None):
         self.id = id
         self.nombre_completo = nombre_completo
@@ -12,380 +46,262 @@ class Cliente:
         self.estado_conversacion = estado_conversacion
         self.producto_seleccionado = producto_seleccionado
 
-    # Método para conectar a la base de datos
-    @staticmethod
-    def get_db_connection():
-        conn = sqlite3.connect(DATABASE)
-        conn.row_factory = sqlite3.Row  # Permite acceder a los datos por nombre de columna
-        return conn
-
-    # Método para crear o actualizar un cliente en la base de datos
     def save(self):
         conn = self.get_db_connection()
         cursor = conn.cursor()
+        try:
+            if self.id:
+                cursor.execute('''
+                    UPDATE clientes
+                    SET nombre_completo = ?, celular = ?, direccion = ?, estado_conversacion = ?, producto_seleccionado = ?
+                    WHERE id = ?
+                ''', (self.nombre_completo, self.celular, self.direccion, self.estado_conversacion, self.producto_seleccionado, self.id))
+            else:
+                cursor.execute('''
+                    INSERT INTO clientes (nombre_completo, celular, direccion, estado_conversacion, producto_seleccionado)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (self.nombre_completo, self.celular, self.direccion, self.estado_conversacion, self.producto_seleccionado))
+                self.id = cursor.lastrowid
+            conn.commit()
+        except sqlite3.Error as e:
+            print(f"Error saving cliente: {e}")
+            conn.rollback()
+        finally:
+            self.close_connection(conn)
 
-        if self.id:  # Si ya tiene un ID, actualizamos el cliente
-            cursor.execute('''
-                UPDATE clientes
-                SET nombre_completo = ?, celular = ?, direccion = ?, estado_conversacion = ?, producto_seleccionado = ?
-                WHERE id = ?
-            ''', (self.nombre_completo, self.celular, self.direccion, self.estado_conversacion, self.producto_seleccionado, self.id))
-        else:  # Si no tiene ID, lo creamos
-            cursor.execute('''
-                INSERT INTO clientes (nombre_completo, celular, direccion, estado_conversacion, producto_seleccionado)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (self.nombre_completo, self.celular, self.direccion, self.estado_conversacion, self.producto_seleccionado))
-            self.id = cursor.lastrowid  # Obtener el ID del cliente recién insertado
-
-        conn.commit()
-        conn.close()
-
-    # Método para eliminar un cliente
     def delete(self):
         if self.id:
             conn = self.get_db_connection()
-            conn.execute('DELETE FROM clientes WHERE id = ?', (self.id,))
-            conn.commit()
-            conn.close()
+            try:
+                conn.execute('DELETE FROM clientes WHERE id = ?', (self.id,))
+                conn.commit()
+            except sqlite3.Error as e:
+                print(f"Error deleting cliente: {e}")
+                conn.rollback()
+            finally:
+                self.close_connection(conn)
 
-    # Método para obtener un cliente por ID
     @staticmethod
     def get_by_id(id):
         conn = Cliente.get_db_connection()
-        cliente_row = conn.execute('SELECT * FROM clientes WHERE id = ?', (id,)).fetchone()
-        conn.close()
-        if cliente_row:
-            return Cliente(cliente_row['nombre_completo'], cliente_row['celular'], cliente_row['direccion'],
-                           cliente_row['id'], cliente_row['estado_conversacion'], cliente_row['producto_seleccionado'])
+        try:
+            cliente_row = conn.execute('SELECT * FROM clientes WHERE id = ?', (id,)).fetchone()
+            if cliente_row:
+                return Cliente(cliente_row['nombre_completo'], cliente_row['celular'], cliente_row['direccion'],
+                               cliente_row['id'], cliente_row['estado_conversacion'], cliente_row['producto_seleccionado'])
+        except sqlite3.Error as e:
+            print(f"Error retrieving cliente: {e}")
+        finally:
+            Cliente.close_connection(conn)
         return None
 
-    # Método para obtener todos los clientes
     @staticmethod
     def get_all():
         conn = Cliente.get_db_connection()
-        clientes = conn.execute('SELECT * FROM clientes').fetchall()
-        conn.close()
-        return [Cliente(cliente['nombre_completo'], cliente['celular'], cliente['direccion'], cliente['id'],
-                        cliente['estado_conversacion'], cliente['producto_seleccionado']) for cliente in clientes]
+        try:
+            clientes = conn.execute('SELECT * FROM clientes').fetchall()
+            return [Cliente(cliente['nombre_completo'], cliente['celular'], cliente['direccion'], cliente['id'],
+                            cliente['estado_conversacion'], cliente['producto_seleccionado']) for cliente in clientes]
+        except sqlite3.Error as e:
+            print(f"Error retrieving all clientes: {e}")
+        finally:
+            Cliente.close_connection(conn)
+        return []
 
-    # Método para obtener un cliente por número de celular
     @staticmethod
     def obtener_por_celular(celular):
         conn = Cliente.get_db_connection()
-        cursor = conn.cursor()
-        query = "SELECT * FROM clientes WHERE celular = ?"
-        cursor.execute(query, (celular,))
-        row = cursor.fetchone()
-        conn.close()
-
-        if row:
-            # Retornar un objeto Cliente si se encuentra en la base de datos
-            return Cliente(
-                nombre_completo=row['nombre_completo'],
-                celular=row['celular'],
-                direccion=row['direccion'],
-                id=row['id'],
-                estado_conversacion=row['estado_conversacion'],
-                producto_seleccionado=row['producto_seleccionado']
-            )
+        try:
+            row = conn.execute("SELECT * FROM clientes WHERE celular = ?", (celular,)).fetchone()
+            if row:
+                return Cliente(
+                    nombre_completo=row['nombre_completo'],
+                    celular=row['celular'],
+                    direccion=row['direccion'],
+                    id=row['id'],
+                    estado_conversacion=row['estado_conversacion'],
+                    producto_seleccionado=row['producto_seleccionado']
+                )
+        except sqlite3.Error as e:
+            print(f"Error retrieving cliente by celular: {e}")
+        finally:
+            Cliente.close_connection(conn)
         return None
 
-class Producto:
+class Producto(BaseModel):
     def __init__(self, nombre, descripcion, precio, id=None):
         self.id = id
         self.nombre = nombre
         self.descripcion = descripcion
         self.precio = precio
 
-    # Método para conectar a la base de datos
-    @staticmethod
-    def get_db_connection():
-        conn = sqlite3.connect(DATABASE)
-        conn.row_factory = sqlite3.Row
-        return conn
-
-    # Método para crear o actualizar un producto
     def save(self):
         conn = self.get_db_connection()
         cursor = conn.cursor()
+        try:
+            if self.id:
+                cursor.execute('''
+                    UPDATE productos
+                    SET nombre = ?, descripcion = ?, precio = ?
+                    WHERE id = ?
+                ''', (self.nombre, self.descripcion, self.precio, self.id))
+            else:
+                cursor.execute('''
+                    INSERT INTO productos (nombre, descripcion, precio)
+                    VALUES (?, ?, ?)
+                ''', (self.nombre, self.descripcion, self.precio))
+                self.id = cursor.lastrowid
+            conn.commit()
+        except sqlite3.Error as e:
+            print(f"Error saving producto: {e}")
+            conn.rollback()
+        finally:
+            self.close_connection(conn)
 
-        if self.id:
-            cursor.execute('''
-                UPDATE productos
-                SET nombre = ?, descripcion = ?, precio = ?
-                WHERE id = ?
-            ''', (self.nombre, self.descripcion, self.precio, self.id))
-        else:
-            cursor.execute('''
-                INSERT INTO productos (nombre, descripcion, precio)
-                VALUES (?, ?, ?)
-            ''', (self.nombre, self.descripcion, self.precio))
-            self.id = cursor.lastrowid
-
-        conn.commit()
-        conn.close()
-
-    # Método para eliminar un producto
     def delete(self):
         if self.id:
             conn = self.get_db_connection()
-            conn.execute('DELETE FROM productos WHERE id = ?', (self.id,))
-            conn.commit()
-            conn.close()
+            try:
+                conn.execute('DELETE FROM productos WHERE id = ?', (self.id,))
+                conn.commit()
+            except sqlite3.Error as e:
+                print(f"Error deleting producto: {e}")
+                conn.rollback()
+            finally:
+                self.close_connection(conn)
 
-    # Método para obtener un producto por ID
     @staticmethod
     def get_by_id(id):
         conn = Producto.get_db_connection()
-        producto_row = conn.execute('SELECT * FROM productos WHERE id = ?', (id,)).fetchone()
-        conn.close()
-        if producto_row:
-            return Producto(producto_row['nombre'], producto_row['descripcion'], producto_row['precio'], producto_row['id'])
-        return None
-    
-    @staticmethod
-    def get_by_nombre(nombre):
-        conn = Producto.get_db_connection()
-        producto_row = conn.execute('SELECT * FROM productos WHERE nombre = ?', (nombre,)).fetchone()
-        conn.close()
-        if producto_row:
-            return Producto(producto_row['nombre'], producto_row['descripcion'], producto_row['precio'], producto_row['id'])
+        try:
+            producto_row = conn.execute('SELECT * FROM productos WHERE id = ?', (id,)).fetchone()
+            if producto_row:
+                return Producto(producto_row['nombre'], producto_row['descripcion'], producto_row['precio'], producto_row['id'])
+        except sqlite3.Error as e:
+            print(f"Error retrieving producto: {e}")
+        finally:
+            Producto.close_connection(conn)
         return None
 
-    # Método para obtener todos los productos
     @staticmethod
     def get_all():
         conn = Producto.get_db_connection()
-        productos = conn.execute('SELECT * FROM productos').fetchall()
-        conn.close()
-        return [Producto(producto['nombre'], producto['descripcion'], producto['precio'], producto['id']) for producto in productos]
-    
+        try:
+            productos = conn.execute('SELECT * FROM productos').fetchall()
+            return [Producto(producto['nombre'], producto['descripcion'], producto['precio'], producto['id']) for producto in productos]
+        except sqlite3.Error as e:
+            print(f"Error retrieving all productos: {e}")
+        finally:
+            Producto.close_connection(conn)
+        return []
 
-class Pedido:
-    def __init__(self, cliente_id, producto_id, cantidad, estado = None, id=None):
+    @staticmethod
+    def get_by_nombre(nombre):
+        conn = Producto.get_db_connection()
+        try:
+            # Query the database for a product matching the given name
+            producto_row = conn.execute('SELECT * FROM productos WHERE nombre = ?', (nombre,)).fetchone()
+            if producto_row:
+                # If a product is found, return an instance of Producto
+                return Producto(
+                    nombre=producto_row['nombre'],
+                    descripcion=producto_row['descripcion'],
+                    precio=producto_row['precio'],
+                    id=producto_row['id']
+                )
+            else:
+                # If no product is found, return False
+                return None
+        except sqlite3.Error as e:
+            print(f"Error retrieving product by name: {e}")
+            return None
+        finally:
+            Producto.close_connection(conn)
+class Pedido(BaseModel):
+    def __init__(self, cliente_id, producto_id, cantidad, estado=None, id=None):
         self.id = id
         self.cliente_id = cliente_id
         self.producto_id = producto_id
         self.cantidad = cantidad
         self.estado = estado
 
-    # Conexión a la base de datos
-    @staticmethod
-    def get_db_connection():
-        conn = sqlite3.connect(DATABASE)
-        conn.row_factory = sqlite3.Row
-        return conn
-
-    # Guardar o actualizar un pedido
     def save(self):
         conn = self.get_db_connection()
         cursor = conn.cursor()
+        try:
+            if self.id:
+                cursor.execute('''
+                    UPDATE pedidos
+                    SET cliente_id = ?, producto_id = ?, cantidad = ?, estado = ?
+                    WHERE id = ?
+                ''', (self.cliente_id, self.producto_id, self.cantidad, self.estado, self.id))
+            else:
+                cursor.execute('''
+                    INSERT INTO pedidos (cliente_id, producto_id, cantidad, estado)
+                    VALUES (?, ?, ?, ?)
+                ''', (self.cliente_id, self.producto_id, self.cantidad, self.estado))
+                self.id = cursor.lastrowid
+            conn.commit()
+        except sqlite3.Error as e:
+            print(f"Error saving pedido: {e}")
+            conn.rollback()
+        finally:
+            self.close_connection(conn)
 
-        if self.id:
-            cursor.execute('''
-                UPDATE pedidos
-                SET cliente_id = ?, producto_id = ?, cantidad = ?, estado = ?
-                WHERE id = ?
-            ''', (self.cliente_id, self.producto_id, self.cantidad, self.estado, self.id))
-        else:
-            cursor.execute('''
-                INSERT INTO pedidos (cliente_id, producto_id, cantidad, estado)
-                VALUES (?, ?, ?, ?)
-            ''', (self.cliente_id, self.producto_id, self.cantidad, self.estado))
-            self.id = cursor.lastrowid
-
-        conn.commit()
-        conn.close()
-
-    # Eliminar un pedido
     def delete(self):
         if self.id:
             conn = self.get_db_connection()
-            conn.execute('DELETE FROM pedidos WHERE id = ?', (self.id,))
-            conn.commit()
-            conn.close()
+            try:
+                conn.execute('DELETE FROM pedidos WHERE id = ?', (self.id,))
+                conn.commit()
+            except sqlite3.Error as e:
+                print(f"Error deleting pedido: {e}")
+                conn.rollback()
+            finally:
+                self.close_connection(conn)
 
-    # Obtener pedido por ID
     @staticmethod
     def get_by_id(id):
         conn = Pedido.get_db_connection()
-        pedido_row = conn.execute('SELECT * FROM pedidos WHERE id = ?', (id,)).fetchone()
-        conn.close()
-        if pedido_row:
-            return Pedido(pedido_row['cliente_id'], pedido_row['producto_id'], pedido_row['cantidad'], pedido_row['estado'], pedido_row['id'])
+        try:
+            pedido_row = conn.execute('SELECT * FROM pedidos WHERE id = ?', (id,)).fetchone()
+            if pedido_row:
+                return Pedido(pedido_row['cliente_id'], pedido_row['producto_id'], pedido_row['cantidad'], pedido_row['estado'], pedido_row['id'])
+        except sqlite3.Error as e:
+            print(f"Error retrieving pedido: {e}")
+        finally:
+            Pedido.close_connection(conn)
         return None
 
-    
-    # Obtener todos los pedidos
     @staticmethod
     def get_all():
         conn = Pedido.get_db_connection()
-        pedidos = conn.execute('SELECT * FROM pedidos').fetchall()
-        conn.close()
-        return [Pedido(pedido['cliente_id'], pedido['producto_id'], pedido['cantidad'], pedido['estado'], pedido['id']) for pedido in pedidos]
+        try:
+            pedidos = conn.execute('SELECT * FROM pedidos').fetchall()
+            return [Pedido(pedido['cliente_id'], pedido['producto_id'], pedido['cantidad'], pedido['estado'], pedido['id']) for pedido in pedidos]
+        except sqlite3.Error as e:
+            print(f"Error retrieving all pedidos: {e}")
+        finally:
+            Pedido.close_connection(conn)
+        return []
+
     @staticmethod
     def get_vista():
         conn = Pedido.get_db_connection()
-        pedidos = conn.execute("""
-                               SELECT c.nombre_completo as nombre ,pro.nombre as producto,p.cantidad as cantidad,p.estado as estado,p.id as id,pro.precio * p.cantidad as total
-                               FROM pedidos AS p
-                               JOIN clientes AS c ON p.cliente_id = c.id
-                               JOIN productos AS pro ON p.producto_id = pro.id
-                               """
-                               ).fetchall()
-        conn.close()
-        return pedidos
-    
+        try:
+            pedidos = conn.execute("""
+                SELECT c.nombre_completo as nombre , pro.nombre as producto, p.cantidad as cantidad, p.estado as estado, p.id as id, pro.precio * p.cantidad as total
+                FROM pedidos AS p
+                JOIN clientes AS c ON p.cliente_id = c.id
+                JOIN productos AS pro ON p.producto_id = pro.id
+            """).fetchall()
+            return pedidos
+        except sqlite3.Error as e:
+            print(f"Error retrieving pedido vista: {e}")
+        finally:
+            Pedido.close_connection(conn)
+        return []
 
-class WhatsAppBot:
-    def __init__(self, api_key, phone_number_id):
-        self.api_key = api_key
-        self.phone_number_id = phone_number_id
-        self.headers = {
-            'Authorization': f'Bearer {self.api_key}',
-            'Content-Type': 'application/json'
-        }
-        self.Conversaciones=[]
-
-    def enviar_mensaje(self, celular, mensaje):
-        url = f"https://graph.facebook.com/v20.0/{self.phone_number_id}/messages"
-        data = {
-            "messaging_product": "whatsapp",
-            "to": celular,
-            "type": "text",
-            "text": {
-                "body": mensaje
-            }
-        }
-        response = requests.post(url, headers=self.headers, json=data)
-        conversacion = self.conversation_by_id(celular)
-        if conversacion:
-            conversacion.update_status()
-        else:
-            conversacion = Conversation(celular)
-            conversacion.update_status()
-            self.Conversaciones.append(conversacion)
-            
-        return response.json()
-    
-    def enviar_template(self,celular, template):
-        url = f"https://graph.facebook.com/v20.0/{self.phone_number_id}/messages"
-        data = {
-            "messaging_product": "whatsapp",
-            "to": celular,
-            "type": "template",
-            "template": {
-                "name": template,
-                "language":{
-                    "code": "es_AR"
-                }
-            }
-        }
-        response = requests.post(url, headers=self.headers, json=data)
-        conversacion = self.conversation_by_id(celular)
-        if conversacion:
-            if conversacion.status != 0:
-                return ValueError
-            conversacion.update_status()
-            print(conversacion.status)
-        else:
-            conversacion = Conversation(celular)
-            conversacion.update_status()
-            self.Conversaciones.append(conversacion)
-            print(conversacion.status)
-            
-        return response.json()        
-
-    def parse_number(self,number):
-        if number[:3] == "549":
-            test = number[:2]
-            aux = number[3:]
-            number=test + aux
-        return number
-
-    def enviar_mensaje_masivo(self, clientes, mensaje):
-        for cliente in clientes:
-            self.enviar_mensaje(cliente[1], mensaje)  # Suponemos que cliente[1] es el celular
-
-    def conversation_by_id(self,id):
-        if len(self.Conversaciones) == 0:
-            return False
-        for x in self.Conversaciones:
-            if x.phone == id:
-                return x
-            else:
-                return False
-        
-
-    def procesar_mensaje(self, data):
-        #Validar que sea un mensaje
-        if 'messages' in data['entry'][0]['changes'][0]['value']:
-            message_data = data['entry'][0]['changes'][0]['value']['messages'][0]    
-            #Revisar si hay una conversacion activa para ese numero
-            phone_number = self.parse_number(message_data['from'])
-            print(data)
-            conversation = self.conversation_by_id(phone_number)
-            if conversation != False:
-                conversation.nuevo_mensaje(message_data)
-            else:
-                self.Conversaciones.append(Conversation(phone_number))
-                conversation = self.Conversaciones[-1]
-                conversation.nuevo_mensaje(message_data)
-            
-            if conversation.get_status() == 1:
-                print(conversation.get_ultimo_mensaje().text)
-                conversation.producto = conversation.get_ultimo_mensaje().text
-                self.enviar_mensaje(phone_number,"¿Cuantos van a necesitar?")
-            if conversation.get_status() == 2:
-                pass
-
-        return False
-
-
-    def confirmar_pedido(self, cliente, productos):
-        # Confirma y guarda el pedido del cliente
-        pedido = Pedido(cliente['celular'], productos)
-        pedido.guardar()
-        return "Tu pedido ha sido confirmado."
-
-class Conversation:
-    def __init__(self, phone):
-       self.Mensajes = [Mensaje]
-       self.phone = phone
-       self.status = 0
-       self.producto =""
-       self.cantidad =0
-
-    def nuevo_mensaje(self,data):
-        self.Mensajes.append(Mensaje(data))
-
-    def get_ultimo_mensaje(self):
-        return self.Mensajes[-1]
-    
-    def update_status(self):
-        self.status = self.status + 1
-        print(self.status)
-    def get_status(self):
-        return self.status
-
-class Mensaje:
-    def __init__(self, data):
-        self.data = data
-        self.text = ""
-        self.parse_text(data)
-
-    def parse_text(self,data):
-        if data['type'] == 'interactive' and data['interactive']['type'] == 'button_reply':
-            text = data['interactive']['button_reply']['title']
-        elif data['type'] == 'button':
-            text = str(data['button']['text'])
-        else:
-            text = data['text']['body']  # Texto del mensaje
-
-        self.text = text
-    
-    def get_text(self):
-        return self.text
 
 class HojaDeRuta:
     def __init__(self, pedidos):
@@ -413,9 +329,13 @@ class HojaDeRuta:
         db.commit()
 
 class Bot:
-    def __init__(self):
-        self.ACCESS_TOKEN = ""
-        pass
+    def __init__(self, api_key, phone_number_id):
+        self.api_key = api_key
+        self.phone_number_id = phone_number_id
+        self.headers = {
+            'Authorization': f'Bearer {self.api_key}',
+            'Content-Type': 'application/json'
+        }
 
     def parse_text(self,data):
         if data['type'] == 'interactive' and data['interactive']['type'] == 'button_reply':
@@ -434,7 +354,6 @@ class Bot:
             number=test + aux
         return number
 
-
     def enviar_saludo(self, cliente:Cliente):
         # Enviar un mensaje de saludo con opciones de productos
         saludo_template = {
@@ -450,35 +369,67 @@ class Bot:
         cliente.estado_conversacion = "esperando_producto"
         cliente.save()
 
-    def enviar_mensaje(self, mensaje):
-        # Función para interactuar con la API de WhatsApp
-        url = 'https://graph.facebook.com/v20.0/364603270066493/messages'
-        headers = {
-            'Authorization': f'Bearer {self.ACCESS_TOKEN}',
-            'Content-Type': 'application/json'
+    def enviar_mensaje(self, celular, mensaje):
+        """Send a message to the WhatsApp API and log it in the database."""
+        url = f"https://graph.facebook.com/v20.0/{self.phone_number_id}/messages"
+        data = {
+            "messaging_product": "whatsapp",
+            "to": celular,  # Phone number with country code, without leading '+'
+            "type": "text",
+            "text": {
+                "body": mensaje
+            }
         }
-        response = requests.post(url, headers=headers, json=mensaje)
-        if response.status_code == 200:
-            print(f"Mensaje enviado a {mensaje['to']}")
-        else:
-            print(f"Error al enviar mensaje: {response.text}")
+        timestamp = int(time.time())
+        try:
+            response = requests.post(url, headers=self.headers, json=data)
+            if response.status_code == 200:
+                # Log the sent message to the database
+                message = Mensaje(
+                    whatsapp_id=celular,
+                    message=mensaje,
+                    direction='sent',
+                    timestamp=timestamp,
+                    message_type='text'
+                )
+                message.save()
+                return response.json()
+            else:
+                print(f"Error: {response.status_code} - {response.text}")
+                return None
+        except requests.RequestException as e:
+            print(f"HTTP Request failed: {e}")
+            return None
 
     def procesar_mensaje(self, data):
         # Procesar la respuesta del cliente
-        print(data)
         if 'messages' in data['entry'][0]['changes'][0]['value']:
             message_data = data['entry'][0]['changes'][0]['value']['messages'][0]
-            cliente_celular = self.parse_number(message_data['from'])
-            texto_mensaje = self.parse_text(message_data)
+            phone_number = self.parse_number(message_data['from'])
+            message_text = self.parse_text(message_data)
+            timestamp = message_data['timestamp']
+
+            # Log the received message to the database
+            message = Mensaje(
+                whatsapp_id=phone_number,
+                message=message_text,
+                direction='received',
+                timestamp=timestamp,
+                message_type='text'
+            )
+            message.save()
+            print(f"Received message from {phone_number}: {message_text}")
 
             # Buscar cliente por su número de celular
-            cliente = Cliente.obtener_por_celular(cliente_celular)
-            print(texto_mensaje)
+            cliente = Cliente.obtener_por_celular(phone_number)
             if cliente:
                 if cliente.estado_conversacion == "esperando_producto":
-                    self.preguntar_cantidad(cliente, texto_mensaje)
+                    producto = Producto.get_by_nombre(message_text)
+                    if producto:
+                        self.preguntar_cantidad(cliente, message_text)
                 elif cliente.estado_conversacion == "esperando_cantidad":
-                    self.confirmar_pedido(cliente, texto_mensaje)
+                    self.confirmar_pedido(cliente, message_text)
+            
 
     def preguntar_cantidad(self, cliente:Cliente, producto_nombre):
         # Actualizar el estado del cliente a "esperando_cantidad"
@@ -513,9 +464,67 @@ class Bot:
                 "body": f"Gracias {cliente.nombre_completo}, tu pedido de {cantidad} {producto.nombre}(s) ha sido registrado."
             }
         }
-        self.enviar_mensaje(mensaje)
+        self.enviar_mensaje(cliente.celular,mensaje)
 
         # Resetear el estado de la conversación del cliente
         cliente.estado_conversacion = None
         cliente.producto_seleccionado = None
         cliente.save()
+
+class Mensaje(BaseModel):
+    def __init__(self, whatsapp_id, message, direction, timestamp, message_type, id=None):
+        self.id = id
+        self.whatsapp_id = whatsapp_id
+        self.message = message
+        self.direction = direction  # 'sent' or 'received'
+        self.timestamp = timestamp
+        self.message_type = message_type  # e.g., 'text', 'image'
+
+    def exists_in_db(self):
+        """Check if the message already exists in the database."""
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.execute('''
+                SELECT 1 FROM mensajes 
+                WHERE whatsapp_id = ? AND message = ? AND timestamp = ?
+            ''', (self.whatsapp_id, self.message, self.timestamp))
+            
+            return cursor.fetchone() is not None  # Returns True if the message exists, False otherwise
+        except sqlite3.Error as e:
+            print(f"Error checking if message exists: {e}")
+            return False
+        finally:
+            self.close_connection(conn)
+
+    def save(self):
+        """Save the message to the database if it doesn't already exist."""
+        if self.exists_in_db():
+            print("Message already exists in the database, skipping save.")
+            return  # Skip saving if the message already exists
+
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO mensajes (whatsapp_id, message, direction, timestamp, type)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (self.whatsapp_id, self.message, self.direction, self.timestamp, self.message_type))
+            conn.commit()
+        except sqlite3.Error as e:
+            print(f"Error saving message: {e}")
+            conn.rollback()
+        finally:
+            self.close_connection(conn)
+
+    @staticmethod
+    def get_all():
+        """Retrieve all messages from the database."""
+        conn = Mensaje.get_db_connection()
+        try:
+            messages = conn.execute('SELECT * FROM mensajes').fetchall()
+            return messages
+        except sqlite3.Error as e:
+            print(f"Error retrieving messages: {e}")
+        finally:
+            Mensaje.close_connection(conn)
+        return []

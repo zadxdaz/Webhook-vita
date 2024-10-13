@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}All Client Lists{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>All Client Lists</h1>
+
+    <!-- Table to display all client lists -->
+    <table border="1" class="client-list-table">
+        <thead>
+            <tr>
+                <th>List ID</th>
+                <th>List Name</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for list in client_lists %}
+            <tr>
+                <td>{{ list.list_id }}</td>
+                <td>{{ list.name }}</td>
+                <td>
+                    <!-- Link to view clients in the list -->
+                    <a href="{{ url_for('view_client_list', list_id=list.list_id) }}">View Clients</a>
+
+                    <!-- Form to delete the client list -->
+                    <form action="{{ url_for('delete_client_list', list_id=list.list_id) }}" method="POST" style="display:inline;">
+                        {{ form.hidden_tag() }}
+                        <button type="submit">Delete List</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3">No client lists found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Form to create a new client list -->
+    <h2>Create New Client List</h2>
+    <form action="{{ url_for('create_client_list') }}" method="POST">
+        <label for="name">List Name:</label>
+        {{ form.hidden_tag() }}
+        <input type="text" id="name" name="name" required>
+        <button type="submit">Create List</button>
+    </form>
+</div>
+
+<style>
+    .container {
+        padding: 20px;
+    }
+
+    h1, h2 {
+        margin-bottom: 20px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+
+    table, th, td {
+        border: 1px solid #ccc;
+    }
+
+    th, td {
+        padding: 10px;
+        text-align: left;
+    }
+
+    th {
+        background-color: #f2f2f2;
+    }
+
+    button {
+        padding: 10px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+
+    button:hover {
+        background-color: #0056b3;
+    }
+</style>
+{% endblock %}
