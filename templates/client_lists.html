@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Clientes{% endblock %}
+
+{% block content %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Client Lists</title>
+</head>
+<body>
+    <h1>All Client Lists</h1>
+    <ul>
+        {% for list in client_lists %}
+            <li>
+                <a href="{{ url_for('view_client_list', lista_id=list.id) }}">{{ list.nombre }}</a>
+            </li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('index') }}">Back to Home</a>
+</body>
+{% endblock %}

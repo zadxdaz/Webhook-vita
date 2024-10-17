@@ -4,20 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nuevo Cliente</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-    <h1>Agregar Cliente</h1>
-    <form action="{{ url_for('nuevo_cliente') }}" method="POST">
-        <label for="nombre_completo">Nombre Completo:</label>
-        <input type="text" id="nombre_completo" name="nombre_completo" required><br>
+    <div class="container mt-5">
+        <h1 class="mb-4">Agregar Cliente</h1>
+        
+        <!-- Client form -->
+        <form action="{{ url_for('nuevo_cliente') }}" method="POST">
+            <!-- Full Name -->
+            <div class="form-group">
+                <label for="nombre_completo">Nombre Completo:</label>
+                <input type="text" class="form-control" id="nombre_completo" name="nombre_completo" required>
+            </div>
 
-        <label for="celular">Celular:</label>
-        <input type="text" id="celular" name="celular" required><br>
+            <!-- Phone Number -->
+            <div class="form-group">
+                <label for="celular">Celular:</label>
+                <input type="text" class="form-control" id="celular" name="celular" required>
+            </div>
 
-        <label for="direccion">Dirección:</label>
-        <input type="text" id="direccion" name="direccion" required><br>
+            <!-- Address -->
+            <div class="form-group">
+                <label for="direccion">Dirección:</label>
+                <input type="text" class="form-control" id="direccion" name="direccion" required>
+            </div>
 
-        <button type="submit">Agregar Cliente</button>
-    </form>
+            <!-- Submit Button -->
+            <button type="submit" class="btn btn-primary">Agregar Cliente</button>
+            {{ form.hidden_tag() }}
+        </form>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>

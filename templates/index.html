@@ -3,43 +3,56 @@
 {% block title %}Clientes{% endblock %}
 
 {% block content %}
-<h1>Lista de Clientes</h1>
-<a href="{{ url_for('nuevo_cliente') }}">Agregar Cliente</a>
-<table border="1">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Nombre</th>
-            <th>Celular</th>
-            <th>Dirección</th>
-            <th>Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for cliente in clientes %}
-        <tr>
-            <td>{{ cliente.id }}</td>
-            <td>{{ cliente.nombre_completo }}</td>
-            <td>{{ cliente.celular }}</td>
-            <td>{{ cliente.direccion }}</td>
-            <td>
-                <a href="{{ url_for('editar_cliente', id=cliente.id) }}">Editar</a>
-                <form action="{{ url_for('eliminar_cliente', id=cliente.id) }}" method="POST" style="display:inline;">
-                    {{ form.hidden_tag() }}
-                    <button type="submit">Eliminar</button>
-                </form>
-                <!-- Botón para iniciar conversación con el bot -->
-                <form action="{{ url_for('iniciar_conversacion', id=cliente.id) }}" method="POST" style="display:inline;">
-                    {{ form.hidden_tag() }}
-                    <button type="submit">Iniciar Bot</button>
-                </form>
-            </td>
-            <td><a href="{{ url_for('client_messages', whatsapp_id=cliente.celular) }}">View Messages</a></td>
+<div class="container mt-4">
+    <h1 class="mb-4">Lista de Clientes</h1>
 
-            
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+    <!-- Button to add a new client -->
+    <a href="{{ url_for('nuevo_cliente') }}" class="btn btn-primary mb-3">Agregar Cliente</a>
+
+    <!-- Client table -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+            <thead class="thead-light">
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Celular</th>
+                    <th>Dirección</th>
+                    <th>Acciones</th>
+                    <th>Mensajes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente in clientes %}
+                <tr>
+                    <td>{{ cliente.id }}</td>
+                    <td>{{ cliente.nombre_completo }}</td>
+                    <td>{{ cliente.celular }}</td>
+                    <td>{{ cliente.direccion }}</td>
+                    <td>
+                        <!-- Edit button -->
+                        <a href="{{ url_for('editar_cliente', id=cliente.id) }}" class="btn btn-warning btn-sm">Editar</a>
+
+                        <!-- Delete form -->
+                        <form action="{{ url_for('eliminar_cliente', id=cliente.id) }}" method="POST" style="display:inline;">
+                            {{ form.hidden_tag() }}
+                            <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                        </form>
+
+                        <!-- Start bot conversation form -->
+                        <form action="{{ url_for('iniciar_conversacion', id=cliente.id) }}" method="POST" style="display:inline;">
+                            {{ form.hidden_tag() }}
+                            <button type="submit" class="btn btn-info btn-sm">Iniciar Bot</button>
+                        </form>
+                    </td>
+                    <!-- View Messages button -->
+                    <td>
+                        <a href="{{ url_for('client_messages', whatsapp_id=cliente.celular) }}" class="btn btn-secondary btn-sm">View Messages</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock %}
-

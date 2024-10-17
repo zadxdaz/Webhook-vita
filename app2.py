@@ -1,12 +1,11 @@
 import os
 import sqlite3
-from flask import Flask, g, render_template, request, redirect, url_for, abort , jsonify
+from flask import Flask, g, render_template, request, redirect, url_for, abort , jsonify, flash
 from flask_wtf.csrf import CSRFProtect 
 from flask_wtf import FlaskForm
 from objetos2 import *
 import functools
 from datetime import datetime
-from ClientList import ClientList
 
 
 # Load sensitive data from environment variables
@@ -87,6 +86,7 @@ def index():
 @app.route('/nuevo_cliente', methods=['GET', 'POST'])
 @handle_db_error
 def nuevo_cliente():
+    form=EmptyForm()
     if request.method == 'POST':
         nombre = request.form['nombre_completo']
         celular = request.form['celular']
@@ -95,7 +95,7 @@ def nuevo_cliente():
         cliente = Cliente(nombre_completo=nombre, celular=celular, direccion=direccion)
         cliente.save()
         return redirect(url_for('index'), 302)
-    return render_template('nuevo_cliente.html'), 200
+    return render_template('nuevo_cliente.html',form=form), 200
 
 @app.route('/editar_cliente/<int:id>', methods=['GET', 'POST'])
 @handle_db_error
@@ -125,8 +125,9 @@ def eliminar_cliente(id):
 @app.route('/productos')
 @handle_db_error
 def productos():
+    form=EmptyForm()
     productos = Producto.get_all()
-    return render_template('productos.html', productos=productos), 200
+    return render_template('productos.html', productos=productos,form=form), 200
 
 @app.route('/nuevo_producto', methods=['GET', 'POST'])
 @handle_db_error
@@ -169,8 +170,9 @@ def eliminar_producto(id):
 @app.route('/pedidos')
 @handle_db_error
 def pedidos():
+    form = EmptyForm()
     pedidos = Pedido.get_vista()
-    return render_template('pedidos.html', pedidos=pedidos), 200
+    return render_template('pedidos.html', pedidos=pedidos, form=form), 200
 
 @app.route('/nuevo_pedido', methods=['GET', 'POST'])
 @handle_db_error
@@ -222,6 +224,7 @@ def eliminar_pedido(id):
 @app.route('/client_messages/<whatsapp_id>', methods=['GET'])
 def client_messages(whatsapp_id):
     conn = Mensaje.get_db_connection()
+    form = EmptyForm()
     try:
         # Fetch the client's data based on the whatsapp_id
         client = Cliente.obtener_por_celular(whatsapp_id)
@@ -235,7 +238,7 @@ def client_messages(whatsapp_id):
 
     return render_template('client_messages.html',  
                            whatsapp_id=whatsapp_id, 
-                           client=client, )
+                           client=client,form=form )
 
 @app.route('/api/messages/<whatsapp_id>', methods=['GET'])
 @csrf.exempt
@@ -288,12 +291,9 @@ def send_message(whatsapp_id):
     data = request.get_json()
     message_text = data.get('message')
 
-    # Simulate sending the message via WhatsApp API (replace with actual API call)
     # Generate the current timestamp
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     bot.enviar_mensaje(celular=whatsapp_id,mensaje=message_text)
-    # Log the sent message to the database
-
     # Return the message_id and timestamp in the response
     return jsonify({"status": "Message sent successfully", "timestamp": timestamp}), 200
 
@@ -311,7 +311,84 @@ def reset_conversation(id):
     # Redirect back to the client message screen after resetting
     return redirect(url_for('client_messages', whatsapp_id=client.celular))
 
+@app.route('/client-lists', methods=['GET'])
+def view_all_client_lists():
+    """Display all client lists."""
+    client_lists = ClientesList.get_all()  # Fetch all client lists
+    return render_template('client_lists.html', client_lists=client_lists)
 
+@app.route('/client-list/<int:lista_id>', methods=['GET'])
+def view_client_list(lista_id):
+    """Display a specific client list and its clients."""
+    client_list = ClientesList.get_by_id(lista_id)  # Fetch the specific list
+    if not client_list:
+        flash('Client list not found', 'error')
+        return redirect(url_for('view_all_client_lists'))
+
+    clients = client_list.get_clientes()  # Fetch all clients in the list
+    all_clients = Cliente.get_all()  # Fetch all available clients to add to the list
+
+    form = EmptyForm()  # Form to protect against CSRF
+    return render_template('client_list.html', client_list=client_list, clients=clients, all_clients=all_clients, form=form)
+
+@app.route('/client-list/<int:lista_id>/add-client', methods=['POST'])
+def add_client_to_list(lista_id):
+    """Add a client to the list."""
+    client_list = ClientesList.get_by_id(lista_id)
+    form = EmptyForm()
+    if form.validate_on_submit():
+        cliente_id = request.form.get('cliente_id')
+        if cliente_id:
+            client_list.add_cliente(cliente_id)
+            flash('Client added successfully', 'success')
+        else:
+            flash('No client selected', 'error')
+    return redirect(url_for('view_client_list', lista_id=lista_id))
+
+@app.route('/client-list/<int:lista_id>/remove-client/<int:cliente_id>', methods=['POST'])
+def remove_client_from_list(lista_id, cliente_id):
+    """Remove a client from the list."""
+    client_list = ClientesList.get_by_id(lista_id)
+    form = EmptyForm()
+    if form.validate_on_submit():
+        client_list.remove_cliente(cliente_id)
+        flash('Client removed successfully', 'success')
+    return redirect(url_for('view_client_list', lista_id=lista_id))
+
+@app.route('/client-list/<int:lista_id>/rename', methods=['POST'])
+def rename_client_list(lista_id):
+    """Rename the client list."""
+    client_list = ClientesList.get_by_id(lista_id)
+    form = EmptyForm()
+    if form.validate_on_submit():
+        new_name = request.form.get('new_name')
+        if new_name:
+            client_list.rename(new_name)
+            flash('Client list renamed successfully', 'success')
+        else:
+            flash('Name cannot be empty', 'error')
+    return redirect(url_for('view_client_list', lista_id=lista_id))
+
+@app.route('/client-list/<int:lista_id>/send-message', methods=['POST'])
+def send_message_to_clients(lista_id):
+    """Send a message to all clients in the list using the Bot.enviar_saludo method."""
+    client_list = ClientesList.get_by_id(lista_id)
+    if not client_list:
+        flash('Client list not found', 'error')
+        return redirect(url_for('view_all_client_lists'))
+
+    clients = client_list.get_clientes()  # Get all clients in the list
+    form = EmptyForm()
+    
+    if form.validate_on_submit(): 
+        for client in clients:
+            bot.enviar_saludo(client)  # Send a message to each client
+
+        flash(f'Message sent to {len(clients)} clients', 'success')
+    else:
+        flash('Failed to send messages', 'error')
+
+    return redirect(url_for('view_client_list', lista_id=lista_id))
 
 
 

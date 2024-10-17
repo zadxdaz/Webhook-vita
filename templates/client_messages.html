@@ -3,162 +3,55 @@
 {% block title %}Messages for {{ whatsapp_id }}{% endblock %}
 
 {% block content %}
-<div class="chat-layout">
-    <!-- Sidebar to show client information -->
-    <div class="client-info">
-        <h2>Client Information</h2>
-        <p><strong>Name:</strong> {{ client.nombre_completo }}</p>
-        <p><strong>Phone:</strong> {{ client.celular }}</p>
-        <p><strong>Address:</strong> {{ client.direccion }}</p>
-        <p><strong>Estado Conversación:</strong> {{ client.estado_conversacion or "None" }}</p>
-        <p><strong>Producto Seleccionado:</strong> {{ client.producto_seleccionado or "None" }}</p>
+<div class="container-fluid mt-4">
+    <div class="row">
+        <!-- Sidebar to show client information -->
+        <div class="col-md-3 bg-light p-3 border-right">
+            <h2>Client Information</h2>
+            <p><strong>Name:</strong> {{ client.nombre_completo }}</p>
+            <p><strong>Phone:</strong> {{ client.celular }}</p>
+            <p><strong>Address:</strong> {{ client.direccion }}</p>
+            <p><strong>Estado Conversación:</strong> {{ client.estado_conversacion or "None" }}</p>
+            <p><strong>Producto Seleccionado:</strong> {{ client.producto_seleccionado or "None" }}</p>
 
-        <!-- Button to reset estado_conversacion and producto_seleccionado -->
-        <form action="{{ url_for('reset_conversation', id=client.id) }}" method="POST">
-            <button type="submit" class="reset-btn">Reset Conversation</button>
-        </form>
-    </div>
-
-    <!-- Chat window -->
-    <div class="chat-container">
-        <h1>Messages for Client: {{ whatsapp_id }}</h1>
-        <div id="message-window" class="message-window">
-            <table border="0" id="message-table">
-                <tbody id="message-body">
-                    <!-- Messages will be loaded here dynamically -->
-                </tbody>
-            </table>
+            <!-- Button to reset estado_conversacion and producto_seleccionado -->
+            <form action="{{ url_for('reset_conversation', id=client.id) }}" method="POST">
+                <button type="submit" class="btn btn-danger mt-3">Reset Conversation</button>
+                {{ form.hidden_tag() }}
+            </form>
         </div>
 
-        <!-- Message input form -->
-        <div class="message-input-container">
-            <input type="text" id="message-input" class="message-input" placeholder="Write your message..." />
-            <button id="send-message-btn" class="send-btn">Send</button>
+        <!-- Chat window -->
+        <div class="col-md-9 d-flex flex-column p-0">
+            <div class="bg-white border-bottom p-3">
+                <h1>Messages for Client: {{ whatsapp_id }}</h1>
+            </div>
+            <div id="message-window" class="flex-grow-1 p-3 bg-light overflow-auto">
+                <table class="table table-borderless" id="message-table">
+                    <tbody id="message-body">
+                        <!-- Messages will be loaded here dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Message input form -->
+            <div class="d-flex p-3 bg-light border-top">
+                <input type="text" id="message-input" class="form-control" placeholder="Write your message..." />
+                <button id="send-message-btn" class="btn btn-primary ml-2">Send</button>
+            </div>
         </div>
     </div>
 </div>
-<style>
-    .chat-layout {
-        display: flex;
-    }
 
-    /* Sidebar for client information */
-    .client-info {
-        flex: 1;
-        padding: 10px;
-        border-right: 1px solid #ccc;
-        background-color: #f9f9f9;
-        max-width: 250px;
-    }
+<!-- Bootstrap and jQuery -->
 
-    .client-info h2 {
-        font-size: 18px;
-        margin-bottom: 10px;
-    }
-
-    .client-info p {
-        margin: 5px 0;
-    }
-
-    .reset-btn {
-        margin-top: 10px;
-        padding: 10px;
-        font-size: 14px;
-        background-color: #dc3545;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-
-    .reset-btn:hover {
-        background-color: #c82333;
-    }
-
-    /* Chat window */
-    .chat-container {
-        flex-grow: 3;
-        display: flex;
-        flex-direction: column;
-        height: 90vh;
-        padding: 10px;
-        background-color: #f7f7f7;
-    }
-
-    .message-window {
-        flex-grow: 1;
-        padding: 10px;
-        overflow-y: scroll;
-        border-bottom: 1px solid #ccc;
-        background-color: #f7f7f7;
-    }
-
-    #message-table {
-    width: 100%;  /* Ensure the table occupies the full width of the container */
-    }
-
-    .message-row {
-    display: flex;
-    margin: 5px 0;
-    width: 100%;  /* Ensure the message row takes full width */
-}
-
-    .message-input-container {
-        display: flex;
-        padding: 10px;
-        background-color: #f1f1f1;
-        border-top: 1px solid #ccc;
-    }
-
-    .message-input {
-        flex-grow: 1;
-        padding: 10px;
-        font-size: 14px;
-        border-radius: 5px;
-        border: 1px solid #ccc;
-    }
-
-    .message-row.sent {
-    justify-content: flex-end;
-    }
-
-    .message-row.received {
-        justify-content: flex-start;
-    }
-    .message.sent {
-    background-color: #dcf8c6;
-    align-self: flex-end;
-    }
-
-    .message.received {
-        background-color: #fff;
-        align-self: flex-start;
-        border: 1px solid #ccc;
-    }
-
-    .send-btn {
-        margin-left: 10px;
-        padding: 10px;
-        font-size: 14px;
-        background-color: #007bff;
-        color: white;
-        border-radius: 5px;
-        border: none;
-        cursor: pointer;
-    }
-
-    .send-btn:hover {
-        background-color: #0056b3;
-    }
-</style>
-
-
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 var whatsapp_id = "{{ whatsapp_id }}";
 var page = 1;
 var hasMore = true;
-var loadedMessageIds = [];  // Array to track loaded message IDs
+var loadedMessageIds = [];
 
 // Function to load messages using AJAX
 function loadMessages() {
@@ -170,65 +63,53 @@ function loadMessages() {
         hasMore = data.has_more;
 
         messages.forEach(function (message) {
-            // Check if the message has already been loaded
             if (!loadedMessageIds.includes(message.id)) {
-                loadedMessageIds.push(message.id);  // Track loaded message
-
-                // Append the message to the bottom of the table
+                loadedMessageIds.push(message.id);
                 appendMessage(message);
             }
         });
 
-        // If no more messages to load, hide the "Load More" button
         if (!hasMore) {
             $('#load-more-btn').hide();
         } else {
             $('#load-more-btn').show();
         }
 
-        // Scroll to the bottom after loading messages
         scrollToBottom();
     }).fail(function() {
         alert("Failed to load messages!");
     });
 }
 
-// Helper function to append a message at the bottom in the correct order
+// Helper function to append a message
 function appendMessage(message) {
-    var rowClass = message.direction === 'sent' ? 'message-row sent' : 'message-row received';
-    var messageClass = message.direction === 'sent' ? 'message sent' : 'message received';
+    var rowClass = message.direction === 'sent' ? 'text-right' : 'text-left';
+    var messageClass = message.direction === 'sent' ? 'bg-success text-white' : 'bg-white border';
 
     $('#message-body').append(
-        `<tr class="${rowClass}">
-            <td><div class="${messageClass}">${message.message}</div></td>
+        `<tr>
+            <td class="${rowClass}">
+                <div class="p-2 rounded ${messageClass}" style="max-width: 70%; display: inline-block;">
+                    ${message.message}
+                </div>
+            </td>
         </tr>`
     );
 }
 
-// Load the first set of messages on page load
-$(document).ready(function () {
-    loadMessages();
-});
-
 // Send message via AJAX
 $('#send-message-btn').on('click', function () {
     var messageText = $('#message-input').val();
-    if (!messageText.trim()) return; // Don't send empty messages
+    if (!messageText.trim()) return;
 
     $.ajax({
         url: `/api/send_message/${whatsapp_id}`,
         method: 'POST',
         contentType: 'application/json',
-        data: JSON.stringify({
-            message: messageText
-        }),
-        success: function (data) {
-            // Clear the input field after sending
+        data: JSON.stringify({ message: messageText }),
+        success: function () {
             $('#message-input').val('');
-
             loadMessages();
-
-            // Scroll to the bottom after sending the message
             scrollToBottom();
         },
         error: function () {
@@ -237,21 +118,23 @@ $('#send-message-btn').on('click', function () {
     });
 });
 
+// Load initial messages on page load
+$(document).ready(function () {
+    loadMessages();
+});
 
 // Poll for new messages every 5 seconds
 setInterval(function () {
     $.get(`/api/messages/${whatsapp_id}`, { page: 1 }, function (data) {
         var newMessages = data.messages;
 
-        // Append new messages at the bottom if they haven't been loaded yet
         newMessages.forEach(function (message) {
             if (!loadedMessageIds.includes(message.id)) {
-                loadedMessageIds.push(message.id);  // Track loaded message
-                appendMessage(message);  // Append new message
+                loadedMessageIds.push(message.id);
+                appendMessage(message);
             }
         });
 
-        // Scroll to the bottom after new messages
         scrollToBottom();
     });
 }, 5000);
@@ -260,7 +143,5 @@ setInterval(function () {
 function scrollToBottom() {
     $('#message-window').scrollTop($('#message-window')[0].scrollHeight);
 }
-
-
 </script>
 {% endblock %}

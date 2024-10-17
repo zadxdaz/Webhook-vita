@@ -355,6 +355,7 @@ class Bot:
         return number
 
     def enviar_saludo(self, cliente:Cliente):
+        url = f"https://graph.facebook.com/v20.0/{self.phone_number_id}/messages"
         # Enviar un mensaje de saludo con opciones de productos
         saludo_template = {
             "messaging_product": "whatsapp",
@@ -365,9 +366,30 @@ class Bot:
                 "language": {"code": "es_AR"},
             }
         }
-        self.enviar_mensaje(saludo_template)
-        cliente.estado_conversacion = "esperando_producto"
-        cliente.save()
+        timestamp = int(time.time())
+        print(cliente.celular)
+        try:
+            response = requests.post(url, headers=self.headers, json=saludo_template)
+            if response.status_code == 200:
+                # Log the sent message to the database
+                
+                message = Mensaje(
+                    whatsapp_id=cliente.celular,
+                    message="saludo",
+                    direction='sent',
+                    timestamp=timestamp,
+                    message_type='text'
+                )
+                message.save()
+                cliente.estado_conversacion = "esperando_producto"
+                cliente.save()
+                return response.json()
+            else:
+                print(f"Error: {response.status_code} - {response.text}")
+                return None
+        except requests.RequestException as e:
+            print(f"HTTP Request failed: {e}")
+            return None
 
     def enviar_mensaje(self, celular, mensaje):
         """Send a message to the WhatsApp API and log it in the database."""
@@ -438,15 +460,9 @@ class Bot:
         cliente.estado_conversacion = "esperando_cantidad"
         cliente.save()
 
-        mensaje = {
-            "messaging_product": "whatsapp",
-            "to": cliente.celular,
-            "type": "text",
-            "text": {
-                "body": f"¿Cuántos {producto.nombre}s te gustaría ordenar?"
-            }
-        }
-        self.enviar_mensaje(mensaje)
+        mensaje = f"¿Cuántos {producto.nombre} te gustaría ordenar?"
+        print(mensaje)
+        self.enviar_mensaje(cliente.celular,mensaje)
 
     def confirmar_pedido(self, cliente:Cliente, cantidad):
         # Crear un pedido en el sistema
@@ -456,14 +472,7 @@ class Bot:
         producto = Producto.get_by_id(pedido.producto_id)
 
         # Enviar confirmación al cliente
-        mensaje = {
-            "messaging_product": "whatsapp",
-            "to": cliente.celular,
-            "type": "text",
-            "text": {
-                "body": f"Gracias {cliente.nombre_completo}, tu pedido de {cantidad} {producto.nombre}(s) ha sido registrado."
-            }
-        }
+        mensaje =  f"Gracias {cliente.nombre_completo}, tu pedido de {cantidad} {producto.nombre}(s) ha sido registrado."
         self.enviar_mensaje(cliente.celular,mensaje)
 
         # Resetear el estado de la conversación del cliente
@@ -528,3 +537,140 @@ class Mensaje(BaseModel):
         finally:
             Mensaje.close_connection(conn)
         return []
+
+class ClientesList(BaseModel):
+    def __init__(self, nombre, id=None):
+        self.id = id
+        self.nombre = nombre
+
+    def save(self):
+        """Create or update a client list in the database."""
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        try:
+            if self.id:
+                cursor.execute('''
+                    UPDATE listas
+                    SET nombre = ?
+                    WHERE id = ?
+                ''', (self.nombre, self.id))
+            else:
+                cursor.execute('''
+                    INSERT INTO listas (nombre)
+                    VALUES (?)
+                ''', (self.nombre,))
+                self.id = cursor.lastrowid
+            conn.commit()
+        except sqlite3.Error as e:
+            print(f"Error saving list: {e}")
+            conn.rollback()
+        finally:
+            self.close_connection(conn)
+
+    def rename(self, nuevo_nombre):
+        """Rename the list."""
+        self.nombre = nuevo_nombre
+        self.save()
+
+    def add_cliente(self, cliente_id):
+        """Add a client to the list."""
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO clientes_listas (lista_id, cliente_id)
+                VALUES (?, ?)
+            ''', (self.id, cliente_id))
+            conn.commit()
+        except sqlite3.Error as e:
+            print(f"Error adding cliente to list: {e}")
+            conn.rollback()
+        finally:
+            self.close_connection(conn)
+
+    def remove_cliente(self, cliente_id):
+        """Remove a client from the list."""
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                DELETE FROM clientes_listas
+                WHERE lista_id = ? AND cliente_id = ?
+            ''', (self.id, cliente_id))
+            conn.commit()
+        except sqlite3.Error as e:
+            print(f"Error removing cliente from list: {e}")
+            conn.rollback()
+        finally:
+            self.close_connection(conn)
+
+    def get_clientes(self):
+        """Retrieve all clients in the list."""
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            clientes = cursor.execute('''
+                SELECT c.*
+                FROM clientes_listas cl
+                JOIN clientes c ON cl.cliente_id = c.id
+                WHERE cl.lista_id = ?
+            ''', (self.id,)).fetchall()
+
+            return [Cliente(
+                nombre_completo=row['nombre_completo'],
+                celular=row['celular'],
+                direccion=row['direccion'],
+                id=row['id'],
+                estado_conversacion=row['estado_conversacion'],
+                producto_seleccionado=row['producto_seleccionado']
+            ) for row in clientes]
+        except sqlite3.Error as e:
+            print(f"Error retrieving clients in list: {e}")
+        finally:
+            self.close_connection(conn)
+        return []
+
+    def delete(self):
+        """Delete the list and remove all associated clients."""
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM clientes_listas WHERE lista_id = ?', (self.id,))
+            cursor.execute('DELETE FROM listas WHERE id = ?', (self.id,))
+            conn.commit()
+        except sqlite3.Error as e:
+            print(f"Error deleting list: {e}")
+            conn.rollback()
+        finally:
+            self.close_connection(conn)
+
+    @staticmethod
+    def get_all():
+        """Retrieve all client lists from the database."""
+        conn = ClientesList.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            rows = cursor.execute('SELECT * FROM listas').fetchall()
+            return [ClientesList(row['nombre'], row['id']) for row in rows]
+        except sqlite3.Error as e:
+            print(f"Error retrieving client lists: {e}")
+        finally:
+            ClientesList.close_connection(conn)
+        return []
+
+    @staticmethod
+    def get_by_id(lista_id):
+        """Retrieve a client list by its ID."""
+        conn = ClientesList.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            row = cursor.execute('SELECT * FROM listas WHERE id = ?', (lista_id,)).fetchone()
+            if row:
+                return ClientesList(row['nombre'], row['id'])
+            else:
+                return None  # No list found with the given ID
+        except sqlite3.Error as e:
+            print(f"Error retrieving client list by ID: {e}")
+        finally:
+            ClientesList.close_connection(conn)
+        return None

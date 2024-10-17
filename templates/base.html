@@ -4,38 +4,62 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sistema de Gestión{% endblock %}</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        nav {
-            background-color: #f8f9fa;
-            padding: 10px;
-            text-align: center;
-        }
-        nav a {
-            margin: 0 15px;
-            text-decoration: none;
-            color: #007bff;
-            font-weight: bold;
-        }
-        nav a:hover {
-            text-decoration: underline;
-        }
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
+            background-color: #f0f8ff; /* Light blue background */
+        }
+        nav.navbar {
+            background-color: #ffffff; /* White navbar background */
+            border-bottom: 2px solid #007bff; /* Light blue border */
+        }
+        nav a.nav-link {
+            color: #007bff; /* Light blue links */
+            font-weight: bold;
+        }
+        nav a.nav-link:hover {
+            color: #0056b3; /* Darker blue on hover */
+            text-decoration: underline;
         }
     </style>
 </head>
 
 <body>
-    <nav>
-        <a href="{{ url_for('index') }}">Clientes</a>
-        <a href="{{ url_for('productos') }}">Productos</a>
-        <a href="{{ url_for('pedidos') }}">Pedidos</a>
-        <a href="{{ url_for('view_all_client_lists') }}">Listas de Clientes</a>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light">
+        <a class="navbar-brand" href="{{ url_for('index') }}">Sistema</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse justify-content-center" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('index') }}">Clientes</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('productos') }}">Productos</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('pedidos') }}">Pedidos</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('view_all_client_lists') }}">Listas de Clientes</a>
+                </li>
+            </ul>
+        </div>
     </nav>
 
-    <div>
+    <!-- Content Section -->
+    <div class="container mt-4">
         {% block content %}{% endblock %}
     </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>

@@ -3,37 +3,49 @@
 {% block title %}Pedidos{% endblock %}
 
 {% block content %}
-<h1>Lista de Pedidos</h1>
-<a href="{{ url_for('nuevo_pedido') }}">Agregar Pedido</a>
-<table border="1">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Cliente</th>
-            <th>Producto</th>
-            <th>Cantidad</th>
-            <th>Estado</th>
-            <th>Total</th>
-            <th>Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for pedido in pedidos %}
-        <tr>
-            <td>{{ pedido.id }}</td>
-            <td>{{ pedido.nombre }}</td>
-            <td>{{ pedido.producto }}</td>
-            <td>{{ pedido.cantidad }}</td>
-            <td>{{ pedido.estado }}</td>
-            <td>{{pedido.total}}</td>
-            <td>
-                <a href="{{ url_for('editar_pedido', id=pedido.id) }}">Editar</a>
-                <form action="{{ url_for('eliminar_pedido', id=pedido.id) }}" method="POST" style="display:inline;">
-                    <button type="submit">Eliminar</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="container mt-4">
+    <h1 class="mb-4">Lista de Pedidos</h1>
+
+    <!-- Button to add a new order -->
+    <a href="{{ url_for('nuevo_pedido') }}" class="btn btn-primary mb-3">Agregar Pedido</a>
+
+    <!-- Orders table -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+            <thead class="thead-light">
+                <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Estado</th>
+                    <th>Total</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pedido in pedidos %}
+                <tr>
+                    <td>{{ pedido.id }}</td>
+                    <td>{{ pedido.nombre }}</td>
+                    <td>{{ pedido.producto }}</td>
+                    <td>{{ pedido.cantidad }}</td>
+                    <td>{{ pedido.estado }}</td>
+                    <td>{{ pedido.total }}</td>
+                    <td>
+                        <!-- Edit button -->
+                        <a href="{{ url_for('editar_pedido', id=pedido.id) }}" class="btn btn-warning btn-sm">Editar</a>
+
+                        <!-- Delete form -->
+                        <form action="{{ url_for('eliminar_pedido', id=pedido.id) }}" method="POST" style="display:inline;">
+                            {{ form.hidden_tag() }}
+                            <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock %}
