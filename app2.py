@@ -3,9 +3,11 @@ import sqlite3
 from flask import Flask, g, render_template, request, redirect, url_for, abort , jsonify, flash
 from flask_wtf.csrf import CSRFProtect 
 from flask_wtf import FlaskForm
+from wtforms import StringField,SubmitField
+from wtforms.validators import DataRequired, Length
 from objetos2 import *
 import functools
-from datetime import datetime
+from datetime import datetime,timedelta
 
 
 # Load sensitive data from environment variables
@@ -32,6 +34,10 @@ def get_db():
 
 class EmptyForm(FlaskForm):
     pass
+
+class ClientListForm(FlaskForm):
+    nombre = StringField('List Name', validators=[DataRequired(), Length(min=2, max=100)])
+    submit = SubmitField('Create List')
 
 @app.teardown_appcontext
 def close_db_connection(exception):
@@ -76,12 +82,45 @@ def iniciar_conversacion(id):
         bot.enviar_saludo(cliente)
     return redirect(url_for('index'), 302)
 
-@app.route('/')
+@app.route('/', methods=['GET'])
 @handle_db_error
 def index():
-    clientes = Cliente.get_all()
+    search_query = request.args.get('search', '')  # Get the search query from the URL
+    page = int(request.args.get('page', 1))  # Get the current page, default to 1
+    per_page = 10  # Set the number of clients to display per page
+
+    # Query to fetch clients, optionally filter by name
+    if search_query:
+        clientes = Cliente.search_by_name(search_query)
+    else:
+        clientes = Cliente.get_all()
+
+    # Paginate the results
+    total_clients = len(clientes)
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated_clients = clientes[start:end]
+
+    # Fetch balance for each client
+    client_data = []
+    for client in paginated_clients:
+        balance = client.get_balance()
+        client_data.append({
+            'client': client,
+            'balance': balance
+        })
+
     form = EmptyForm()
-    return render_template('index.html', clientes=clientes,  form=form), 200
+
+    return render_template(
+        'index.html', 
+        clients=client_data, 
+        search_query=search_query, 
+        page=page, 
+        per_page=per_page, 
+        total_clients=total_clients,
+        form=form
+    )
 
 @app.route('/nuevo_cliente', methods=['GET', 'POST'])
 @handle_db_error
@@ -177,6 +216,7 @@ def pedidos():
 @app.route('/nuevo_pedido', methods=['GET', 'POST'])
 @handle_db_error
 def nuevo_pedido():
+    form = EmptyForm()
     clientes = Cliente.get_all()
     productos = Producto.get_all()
 
@@ -189,7 +229,7 @@ def nuevo_pedido():
         pedido = Pedido(cliente_id=cliente_id, producto_id=producto_id, cantidad=cantidad, estado=estado)
         pedido.save()
         return redirect(url_for('pedidos'), 302)
-    return render_template('nuevo_pedido.html', clientes=clientes, productos=productos), 200
+    return render_template('nuevo_pedido.html', clientes=clientes, productos=productos,form=form), 200
 
 @app.route('/editar_pedido/<int:id>', methods=['GET', 'POST'])
 @handle_db_error
@@ -197,6 +237,7 @@ def editar_pedido(id):
     pedido = Pedido.get_by_id(id)
     clientes = Cliente.get_all()
     productos = Producto.get_all()
+    form = EmptyForm()
 
     if request.method == 'POST':
         cliente_id = request.form['cliente_id']
@@ -209,9 +250,10 @@ def editar_pedido(id):
         pedido.cantidad = cantidad
         pedido.estado = estado
         pedido.save()
+        
         return redirect(url_for('pedidos'), 302)
 
-    return render_template('editar_pedido.html', pedido=pedido, clientes=clientes, productos=productos), 200
+    return render_template('editar_pedido.html', pedido=pedido, clientes=clientes, productos=productos,form = form), 200
 
 @app.route('/eliminar_pedido/<int:id>', methods=['POST'])
 @handle_db_error
@@ -389,6 +431,159 @@ def send_message_to_clients(lista_id):
         flash('Failed to send messages', 'error')
 
     return redirect(url_for('view_client_list', lista_id=lista_id))
+
+@app.route('/nuevo_lista', methods=['GET', 'POST'])
+@handle_db_error
+def nuevo_lista():
+    form = ClientListForm()
+    if form.validate_on_submit():
+        # Create new client list using the submitted form data
+        client_list = ClientesList(nombre=form.nombre.data)
+        client_list.save()
+        flash('New client list created successfully!', 'success')
+        return redirect(url_for('view_all_client_lists'))
+    
+    return render_template('nuevo_lista.html', form=form), 200
+
+@app.route('/api/cliente/<int:client_id>/balance', methods=['GET'])
+def get_client_balance(client_id):
+    client = Cliente.get_by_id(client_id)
+    if not client:
+        return jsonify({'error': 'Client not found'}), 404
+
+    balance = client.get_balance()
+    return jsonify({'client_id': client_id, 'balance': balance}), 200
+
+@app.route('/accounting', methods=['GET', 'POST'])
+@handle_db_error
+def accounting():
+    # Handle adding a new transaction via POST request
+    if request.method == 'POST':
+        client_id = request.form.get('client_id')
+        amount = float(request.form.get('amount'))
+        description = request.form.get('description')
+        transaction_type = request.form.get('transaction_type')  # 'debt' or 'payment'
+
+        # Create a transaction (positive amount for payment, negative for debt)
+        if transaction_type == 'debt':
+            amount = -abs(amount)  # Convert to negative for debts
+        else:
+            amount = abs(amount)  # Ensure it's positive for payments
+
+        transaction = Transaction(client_id=client_id, amount=amount, description=description)
+        transaction.save()
+
+        flash('Transaction added successfully!', 'success')
+        return redirect(url_for('accounting'))
+
+    # Fetch all transactions
+    transactions = Transaction.get_all()
+
+    # Fetch debts older than one month
+    one_month_ago = datetime.now() - timedelta(days=30)
+    old_debts = Transaction.get_debts_older_than(one_month_ago)
+
+    # Fetch all clients to populate the form
+    clients = Cliente.get_all()
+
+    return render_template('accounting.html', transactions=transactions, old_debts=old_debts, clients=clients)
+
+@app.route('/hoja-de-ruta/nueva', methods=['POST'])
+@handle_db_error
+def create_hoja_de_ruta():
+    # Get selected pedidos (orders) from the form
+    pedidos_ids = request.form.getlist('pedido_id')
+    
+    if not pedidos_ids:
+        flash('No orders selected', 'error')
+        return redirect(url_for('pedidos'))
+
+    # Create a new Hoja de Ruta (Delivery Route)
+    hoja_de_ruta = HojaDeRuta()
+    hoja_de_ruta.save()  # Save to DB to get the new hoja_de_ruta.id
+
+    # Add the selected pedidos to the Hoja de Ruta with the status 'on delivery'
+    for index, pedido_id in enumerate(pedidos_ids):
+        hoja_de_ruta_pedido = HojaDeRutaPedido(
+            hoja_de_ruta_id=hoja_de_ruta.id,
+            pedido_id=pedido_id,
+            posicion=index + 1,  # Position in the list
+            estado='on delivery'
+        )
+        hoja_de_ruta_pedido.save()
+
+        # Update the state of the pedido to 'on delivery'
+        pedido = Pedido.get_by_id(pedido_id)
+        pedido.estado = 'on delivery'
+        pedido.save()
+
+    flash('Hoja de Ruta created successfully!', 'success')
+    return redirect(url_for('view_hoja_de_ruta', hoja_id=hoja_de_ruta.id))
+
+@app.route('/hoja-de-ruta/<int:hoja_id>', methods=['GET', 'POST'])
+@handle_db_error
+def view_hoja_de_ruta(hoja_id):
+    hoja_de_ruta = HojaDeRuta.get_by_id(hoja_id)
+    form=EmptyForm()
+    if request.method == 'POST':
+        # Handle updating positions or marking orders as delivered
+        pedidos_posiciones = request.form.getlist('pedido_posicion')
+        entregado_pedido_id = request.form.get('entregado_pedido_id')
+
+        # Update positions of the pedidos in the hoja de ruta
+        if pedidos_posiciones:
+            for index, pedido_id in enumerate(pedidos_posiciones):
+                hoja_de_ruta_pedido = HojaDeRutaPedido.get_by_pedido_id_and_hoja_id(pedido_id, hoja_id)
+                hoja_de_ruta_pedido.posicion = index + 1
+                hoja_de_ruta_pedido.save()
+
+        # Mark a pedido as delivered and create debt for the client
+        if entregado_pedido_id:
+            hoja_de_ruta_pedido = HojaDeRutaPedido.get_by_pedido_id_and_hoja_id(entregado_pedido_id, hoja_id)
+            hoja_de_ruta_pedido.estado = 'delivered'
+            hoja_de_ruta_pedido.save()
+
+            # Update the pedido state
+            pedido = Pedido.get_by_id(entregado_pedido_id)
+            pedido.estado = 'delivered'
+            pedido.save()
+
+            # Create a debt for the client
+            debt = Transaction(
+                client_id=pedido.cliente_id,
+                amount=-pedido.total,  # Negative amount to indicate debt
+                description=f"Delivery of order {pedido.id}"
+            )
+            debt.save()
+
+            flash('Pedido marked as delivered and debt created!', 'success')
+
+        return redirect(url_for('view_hoja_de_ruta', hoja_id=hoja_id))
+
+    # Fetch all pedidos in the hoja de ruta
+    pedidos = HojaDeRutaPedido.get_by_hoja_id(hoja_id)
+
+    return render_template('hoja_de_ruta.html', hoja_de_ruta=hoja_de_ruta, pedidos=pedidos,form=form)
+
+@app.route('/hoja-de-ruta/<int:hoja_id>/pedido/<int:pedido_id>/entregado', methods=['POST'])
+@handle_db_error
+def mark_as_delivered(hoja_id, pedido_id):
+    form = EmptyForm()
+    if form.validate_on_submit():
+        hoja_pedido = HojaDeRutaPedido.get_by_pedido_id_and_hoja_id(pedido_id, hoja_id)
+        if hoja_pedido:
+            hoja_pedido.estado = 'delivered'
+            hoja_pedido.save()
+
+            # Update the Pedido state to 'delivered'
+            pedido = Pedido.get_by_id(pedido_id)
+            pedido.update_estado('delivered')
+
+            flash('Pedido marked as delivered!', 'success')
+        else:
+            flash('Pedido not found in the Hoja de Ruta.', 'error')
+    
+    return redirect(url_for('view_hoja_de_ruta', hoja_id=hoja_id))
 
 
 

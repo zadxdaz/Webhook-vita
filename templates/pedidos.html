@@ -9,43 +9,87 @@
     <!-- Button to add a new order -->
     <a href="{{ url_for('nuevo_pedido') }}" class="btn btn-primary mb-3">Agregar Pedido</a>
 
-    <!-- Orders table -->
-    <div class="table-responsive">
-        <table class="table table-bordered table-striped">
-            <thead class="thead-light">
-                <tr>
-                    <th>ID</th>
-                    <th>Cliente</th>
-                    <th>Producto</th>
-                    <th>Cantidad</th>
-                    <th>Estado</th>
-                    <th>Total</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for pedido in pedidos %}
-                <tr>
-                    <td>{{ pedido.id }}</td>
-                    <td>{{ pedido.nombre }}</td>
-                    <td>{{ pedido.producto }}</td>
-                    <td>{{ pedido.cantidad }}</td>
-                    <td>{{ pedido.estado }}</td>
-                    <td>{{ pedido.total }}</td>
-                    <td>
-                        <!-- Edit button -->
-                        <a href="{{ url_for('editar_pedido', id=pedido.id) }}" class="btn btn-warning btn-sm">Editar</a>
+    <!-- Form to select Pedidos for Hoja de Ruta creation -->
+    <form id="hoja-ruta-form" action="{{ url_for('create_hoja_de_ruta') }}" method="POST">
+        {{ form.hidden_tag() }}
 
-                        <!-- Delete form -->
-                        <form action="{{ url_for('eliminar_pedido', id=pedido.id) }}" method="POST" style="display:inline;">
-                            {{ form.hidden_tag() }}
-                            <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        <!-- Orders table -->
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Select</th>
+                        <th>ID</th>
+                        <th>Cliente</th>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th>Estado</th>
+                        <th>Total</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pedido in pedidos %}
+                    <tr>
+                        <td>
+                            <!-- Checkbox to select Pedido for Hoja de Ruta -->
+                            <input type="checkbox" name="pedido_id" value="{{ pedido.id }}" class="pedido-checkbox"
+                                {% if pedido.estado != 'pendiente' %}disabled{% endif %}>
+                        </td>
+                        <td>{{ pedido.id }}</td>
+                        <td>{{ pedido.nombre }}</td>
+                        <td>{{ pedido.producto }}</td>
+                        <td>{{ pedido.cantidad }}</td>
+                        <td>{{ pedido.estado }}</td>
+                        <td>{{ pedido.total }}</td>
+                        <td>
+                            <!-- Edit button (separate link) -->
+                            <a href="{{ url_for('editar_pedido', id=pedido.id) }}" class="btn btn-warning btn-sm">Editar</a>
+
+                            <!-- Delete button triggers a JS function, no need for a form -->
+                            <button type="button" class="btn btn-danger btn-sm" onclick="deletePedido({{ pedido.id }})">Eliminar</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Button to create Hoja de Ruta -->
+        <button type="submit" id="create-hoja-btn" class="btn btn-primary mt-3" disabled>Crear Hoja de Ruta</button>
+    </form>
 </div>
+
+<!-- JavaScript for handling Delete requests -->
+<script>
+    function deletePedido(pedidoId) {
+        if (confirm('¿Estás seguro de que deseas eliminar este pedido?')) {
+            // Create a form dynamically to submit the DELETE request
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/eliminar_pedido/${pedidoId}`;
+
+            // Add CSRF token to the form (this assumes you're passing the token via a global JS variable)
+            const csrfTokenInput = document.createElement('input');
+            csrfTokenInput.type = 'hidden';
+            csrfTokenInput.name = 'csrf_token';
+            csrfTokenInput.value = '{{ csrf_token() }}';  // Assuming CSRF is passed like this
+            form.appendChild(csrfTokenInput);
+
+            document.body.appendChild(form);  // Add form to the document
+            form.submit();  // Submit the form
+        }
+    }
+
+    // Handle enabling the "Create Hoja de Ruta" button based on selected Pedidos
+    const createHojaBtn = document.getElementById('create-hoja-btn');
+    const checkboxes = document.querySelectorAll('.pedido-checkbox');
+
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+            createHojaBtn.disabled = !anyChecked;
+        });
+    });
+</script>
 {% endblock %}

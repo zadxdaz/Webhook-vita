@@ -63,6 +63,40 @@ CREATE TABLE list_members (
     FOREIGN KEY (client_id) REFERENCES clientes(id)
 );
 
+CREATE TABLE IF NOT EXISTS transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER,
+    amount REAL NOT NULL,
+    description TEXT,
+    date TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clientes(id)
+);
+
+CREATE TABLE IF NOT EXISTS hojas_de_ruta (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT DEFAULT CURRENT_TIMESTAMP,
+    estado TEXT DEFAULT 'on delivery'
+);
+
+CREATE TABLE IF NOT EXISTS hojas_de_ruta_pedidos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hoja_de_ruta_id INTEGER,
+    pedido_id INTEGER,
+    posicion INTEGER,
+    estado TEXT DEFAULT 'on delivery',
+    FOREIGN KEY (hoja_de_ruta_id) REFERENCES hojas_de_ruta(id),
+    FOREIGN KEY (pedido_id) REFERENCES pedidos(id)
+);
+
+CREATE VIEW hoja_de_ruta_detalle AS
+SELECT p.id AS pedido_id, c.nombre_completo AS cliente, pro.nombre AS producto, 
+       p.cantidad, c.direccion AS ubicacion, p.estado
+FROM hojas_de_ruta_pedidos hdp
+JOIN pedidos p ON hdp.pedido_id = p.id
+JOIN clientes c ON p.cliente_id = c.id
+JOIN productos pro ON p.producto_id = pro.id;
+
+
 """
 
 # Función para conectar a la base de datos y ejecutar la query

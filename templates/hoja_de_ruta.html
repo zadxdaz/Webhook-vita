@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Hoja de Ruta{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Hoja de Ruta #{{ hoja_de_ruta.id }}</h1>
+
+    <!-- Table of Pedidos in the Hoja de Ruta -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+            <thead class="thead-light">
+                <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Ubicación</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pedido in pedidos %}
+                <tr>
+                    <td>{{ pedido.pedido_id }}</td>
+                    <td>{{ pedido.cliente }}</td>
+                    <td>{{ pedido.producto }}</td>
+                    <td>{{ pedido.cantidad }}</td>
+                    <td>{{ pedido.ubicacion }}</td>
+                    <td>{{ pedido.estado }}</td>
+                    <td>
+                        <!-- Mark as delivered button -->
+                        {% if pedido.estado == 'on delivery' %}
+                        <form action="{{ url_for('mark_as_delivered', pedido_id=pedido.pedido_id, hoja_id=hoja_de_ruta.id) }}" method="POST" style="display:inline;">
+                            {{ form.hidden_tag() }}
+                            <button type="submit" class="btn btn-success btn-sm">Entregado</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

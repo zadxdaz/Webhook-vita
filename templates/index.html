@@ -9,6 +9,12 @@
     <!-- Button to add a new client -->
     <a href="{{ url_for('nuevo_cliente') }}" class="btn btn-primary mb-3">Agregar Cliente</a>
 
+    <!-- Search Form -->
+    <form method="GET" action="{{ url_for('index') }}" class="form-inline mb-3">
+        <input type="text" name="search" placeholder="Buscar por nombre" value="{{ search_query }}" class="form-control mr-2">
+        <button type="submit" class="btn btn-secondary">Buscar</button>
+    </form>
+
     <!-- Client table -->
     <div class="table-responsive">
         <table class="table table-bordered table-striped">
@@ -18,41 +24,66 @@
                     <th>Nombre</th>
                     <th>Celular</th>
                     <th>Dirección</th>
+                    <th>Balance</th> <!-- New balance column -->
                     <th>Acciones</th>
                     <th>Mensajes</th>
                 </tr>
             </thead>
             <tbody>
-                {% for cliente in clientes %}
+                {% for cliente_info in clients %}
                 <tr>
-                    <td>{{ cliente.id }}</td>
-                    <td>{{ cliente.nombre_completo }}</td>
-                    <td>{{ cliente.celular }}</td>
-                    <td>{{ cliente.direccion }}</td>
+                    <td>{{ cliente_info.client.id }}</td>
+                    <td>{{ cliente_info.client.nombre_completo }}</td>
+                    <td>{{ cliente_info.client.celular }}</td>
+                    <td>{{ cliente_info.client.direccion }}</td>
+                    <td>{{ cliente_info.balance }}</td> <!-- Display client balance -->
+
                     <td>
                         <!-- Edit button -->
-                        <a href="{{ url_for('editar_cliente', id=cliente.id) }}" class="btn btn-warning btn-sm">Editar</a>
+                        <a href="{{ url_for('editar_cliente', id=cliente_info.client.id) }}" class="btn btn-warning btn-sm">Editar</a>
 
                         <!-- Delete form -->
-                        <form action="{{ url_for('eliminar_cliente', id=cliente.id) }}" method="POST" style="display:inline;">
+                        <form action="{{ url_for('eliminar_cliente', id=cliente_info.client.id) }}" method="POST" style="display:inline;">
                             {{ form.hidden_tag() }}
                             <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
                         </form>
 
                         <!-- Start bot conversation form -->
-                        <form action="{{ url_for('iniciar_conversacion', id=cliente.id) }}" method="POST" style="display:inline;">
+                        <form action="{{ url_for('iniciar_conversacion', id=cliente_info.client.id) }}" method="POST" style="display:inline;">
                             {{ form.hidden_tag() }}
                             <button type="submit" class="btn btn-info btn-sm">Iniciar Bot</button>
                         </form>
                     </td>
+
                     <!-- View Messages button -->
                     <td>
-                        <a href="{{ url_for('client_messages', whatsapp_id=cliente.celular) }}" class="btn btn-secondary btn-sm">View Messages</a>
+                        <a href="{{ url_for('client_messages', whatsapp_id=cliente_info.client.celular) }}" class="btn btn-secondary btn-sm">View Messages</a>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    <!-- Pagination -->
+    <nav aria-label="Client Pagination">
+        <ul class="pagination">
+            {% if page > 1 %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('index', search=search_query, page=page-1) }}">Previous</a>
+            </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <a class="page-link">Page {{ page }}</a>
+            </li>
+
+            {% if total_clients > page * per_page %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('index', search=search_query, page=page+1) }}">Next</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
 </div>
 {% endblock %}

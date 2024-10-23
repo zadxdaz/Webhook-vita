@@ -3,20 +3,23 @@
 {% block title %}Clientes{% endblock %}
 
 {% block content %}
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Client Lists</title>
-</head>
-<body>
-    <h1>All Client Lists</h1>
-    <ul>
+<div class="container mt-4">
+    <h1 class="mb-4">All Client Lists</h1>
+
+    <!-- Client Lists -->
+    <ul class="list-group mb-4">
         {% for list in client_lists %}
-            <li>
-                <a href="{{ url_for('view_client_list', lista_id=list.id) }}">{{ list.nombre }}</a>
-            </li>
+        <li class="list-group-item">
+            <a href="{{ url_for('view_client_list', lista_id=list.id) }}">{{ list.nombre }}</a>
+        </li>
         {% endfor %}
     </ul>
-    <a href="{{ url_for('index') }}">Back to Home</a>
-</body>
+
+
+<!-- Bootstrap button for creating a new client list -->
+<a href="{{ url_for('nuevo_lista') }}" class="btn btn-success mt-3">Create New Client List</a>
+
+    <!-- Back to Home Button -->
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+</div>
 {% endblock %}

@@ -127,6 +127,25 @@ class Cliente(BaseModel):
         finally:
             Cliente.close_connection(conn)
         return None
+    
+    def get_balance(self):
+        transactions = Transaction.get_by_client_id(self.id)
+        balance = sum([t.amount for t in transactions])  # Sum the 'amount' field in all transactions
+        return balance
+    
+    @staticmethod
+    def search_by_name(name):
+        conn = Cliente.get_db_connection()
+        try:
+            # Search clients whose name contains the search query (case-insensitive)
+            query = '%' + name + '%'
+            rows = conn.execute('SELECT * FROM clientes WHERE nombre_completo LIKE ?', (query,)).fetchall()
+            return [Cliente(row['nombre_completo'], row['celular'], row['direccion'], row['id'], row['estado_conversacion'], row['producto_seleccionado']) for row in rows]
+        except sqlite3.Error as e:
+            print(f"Error searching clients: {e}")
+        finally:
+            Cliente.close_connection(conn)
+        return []
 
 class Producto(BaseModel):
     def __init__(self, nombre, descripcion, precio, id=None):
@@ -218,29 +237,45 @@ class Producto(BaseModel):
         finally:
             Producto.close_connection(conn)
 class Pedido(BaseModel):
-    def __init__(self, cliente_id, producto_id, cantidad, estado=None, id=None):
+    def __init__(self, cliente_id, producto_id, cantidad, estado='pending', id=None):
         self.id = id
         self.cliente_id = cliente_id
         self.producto_id = producto_id
         self.cantidad = cantidad
         self.estado = estado
+        self.total = self.calculate_total()  # Automatically calculate total based on product price
+
+    def calculate_total(self):
+        """Calculate the total price of the Pedido based on the product's price."""
+        conn = self.get_db_connection()
+        try:
+            product = conn.execute('SELECT precio FROM productos WHERE id = ?', (self.producto_id,)).fetchone()
+            if product:
+                return float(product['precio']) * int(self.cantidad)
+            else:
+                return 0  # Default to 0 if product not found
+        except sqlite3.Error as e:
+            print(f"Error calculating total: {e}")
+        finally:
+            self.close_connection(conn)
 
     def save(self):
+        """Save or update the Pedido in the database."""
         conn = self.get_db_connection()
         cursor = conn.cursor()
         try:
             if self.id:
                 cursor.execute('''
                     UPDATE pedidos
-                    SET cliente_id = ?, producto_id = ?, cantidad = ?, estado = ?
+                    SET cliente_id = ?, producto_id = ?, cantidad = ?, estado = ?, total = ?
                     WHERE id = ?
-                ''', (self.cliente_id, self.producto_id, self.cantidad, self.estado, self.id))
+                ''', (self.cliente_id, self.producto_id, self.cantidad, self.estado, self.total, self.id))
             else:
                 cursor.execute('''
-                    INSERT INTO pedidos (cliente_id, producto_id, cantidad, estado)
-                    VALUES (?, ?, ?, ?)
-                ''', (self.cliente_id, self.producto_id, self.cantidad, self.estado))
-                self.id = cursor.lastrowid
+                    INSERT INTO pedidos (cliente_id, producto_id, cantidad, estado, total)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (self.cliente_id, self.producto_id, self.cantidad, self.estado, self.total))
+                self.id = cursor.lastrowid  # Get the last inserted ID
             conn.commit()
         except sqlite3.Error as e:
             print(f"Error saving pedido: {e}")
@@ -248,7 +283,13 @@ class Pedido(BaseModel):
         finally:
             self.close_connection(conn)
 
+    def update_estado(self, new_estado):
+        """Update the estado (status) of the Pedido."""
+        self.estado = new_estado
+        self.save()
+
     def delete(self):
+        """Delete the Pedido from the database."""
         if self.id:
             conn = self.get_db_connection()
             try:
@@ -262,6 +303,7 @@ class Pedido(BaseModel):
 
     @staticmethod
     def get_by_id(id):
+        """Retrieve a Pedido by its ID."""
         conn = Pedido.get_db_connection()
         try:
             pedido_row = conn.execute('SELECT * FROM pedidos WHERE id = ?', (id,)).fetchone()
@@ -275,6 +317,7 @@ class Pedido(BaseModel):
 
     @staticmethod
     def get_all():
+        """Retrieve all Pedidos."""
         conn = Pedido.get_db_connection()
         try:
             pedidos = conn.execute('SELECT * FROM pedidos').fetchall()
@@ -287,20 +330,35 @@ class Pedido(BaseModel):
 
     @staticmethod
     def get_vista():
+        """Retrieve a detailed view of Pedidos, including client names and product details."""
         conn = Pedido.get_db_connection()
         try:
-            pedidos = conn.execute("""
-                SELECT c.nombre_completo as nombre , pro.nombre as producto, p.cantidad as cantidad, p.estado as estado, p.id as id, pro.precio * p.cantidad as total
+            pedidos = conn.execute('''
+                SELECT c.nombre_completo as nombre, pro.nombre as producto, p.cantidad as cantidad, p.estado as estado, p.id as id, pro.precio * p.cantidad as total
                 FROM pedidos AS p
                 JOIN clientes AS c ON p.cliente_id = c.id
                 JOIN productos AS pro ON p.producto_id = pro.id
-            """).fetchall()
+            ''').fetchall()
             return pedidos
         except sqlite3.Error as e:
             print(f"Error retrieving pedido vista: {e}")
         finally:
             Pedido.close_connection(conn)
         return []
+
+    @staticmethod
+    def get_by_estado(estado):
+        """Retrieve all Pedidos by their estado (status)."""
+        conn = Pedido.get_db_connection()
+        try:
+            pedidos = conn.execute('SELECT * FROM pedidos WHERE estado = ?', (estado,)).fetchall()
+            return [Pedido(pedido['cliente_id'], pedido['producto_id'], pedido['cantidad'], pedido['estado'], pedido['id']) for pedido in pedidos]
+        except sqlite3.Error as e:
+            print(f"Error retrieving pedidos by estado: {e}")
+        finally:
+            Pedido.close_connection(conn)
+        return []
+
 
 
 class HojaDeRuta:
@@ -674,3 +732,205 @@ class ClientesList(BaseModel):
         finally:
             ClientesList.close_connection(conn)
         return None
+    
+class Transaction(BaseModel):
+    def __init__(self, client_id, amount, description=None, date=None, id=None):
+        self.id = id
+        self.client_id = client_id
+        self.amount = amount
+        self.description = description
+        self.date = date
+
+    def save(self):
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO transactions (client_id, amount, description, date)
+                VALUES (?, ?, ?, ?)
+            ''', (self.client_id, self.amount, self.description, self.date))
+            conn.commit()
+        except sqlite3.Error as e:
+            print(f"Error saving transaction: {e}")
+            conn.rollback()
+        finally:
+            self.close_connection(conn)
+
+    @staticmethod
+    def get_by_client_id(client_id):
+        conn = Transaction.get_db_connection()
+        try:
+            transactions = conn.execute('SELECT * FROM transactions WHERE client_id = ?', (client_id,)).fetchall()
+            return transactions
+        except sqlite3.Error as e:
+            print(f"Error retrieving transactions: {e}")
+        finally:
+            Transaction.close_connection(conn)
+        return []
+
+    @staticmethod
+    def get_debts_older_than(date):
+        conn = Transaction.get_db_connection()
+        try:
+            rows = conn.execute('''
+                SELECT * FROM transactions
+                WHERE amount < 0 AND date < ?
+            ''', (date,)).fetchall()
+            return [Transaction(row['client_id'], row['amount'], row['description'], row['date'], row['id']) for row in rows]
+        except sqlite3.Error as e:
+            print(f"Error retrieving old debts: {e}")
+        finally:
+            Transaction.close_connection(conn)
+        return []
+
+    @staticmethod
+    def get_all():
+        conn = Transaction.get_db_connection()
+        try:
+            rows = conn.execute('SELECT * FROM transactions').fetchall()
+            return [Transaction(row['client_id'], row['amount'], row['description'], row['date'], row['id']) for row in rows]
+        except sqlite3.Error as e:
+            print(f"Error retrieving transactions: {e}")
+        finally:
+            Transaction.close_connection(conn)
+        return []
+
+class HojaDeRuta(BaseModel):
+    def __init__(self, id=None, fecha=None, estado='on delivery'):
+        self.id = id
+        self.fecha = fecha
+        self.estado = estado
+
+    def save(self):
+        """Save the Hoja de Ruta to the database."""
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        try:
+            if self.id:
+                cursor.execute('''
+                    UPDATE hojas_de_ruta
+                    SET estado = ?
+                    WHERE id = ?
+                ''', (self.estado, self.id))
+            else:
+                cursor.execute('''
+                    INSERT INTO hojas_de_ruta (fecha, estado)
+                    VALUES (CURRENT_TIMESTAMP, ?)
+                ''', (self.estado,))
+                self.id = cursor.lastrowid  # Get the last inserted ID
+            conn.commit()
+        except sqlite3.Error as e:
+            print(f"Error saving Hoja de Ruta: {e}")
+            conn.rollback()
+        finally:
+            self.close_connection(conn)
+
+    @staticmethod
+    def get_by_id(hoja_id):
+        """Retrieve a Hoja de Ruta by its ID."""
+        conn = HojaDeRuta.get_db_connection()
+        try:
+            row = conn.execute('SELECT * FROM hojas_de_ruta WHERE id = ?', (hoja_id,)).fetchone()
+            if row:
+                return HojaDeRuta(id=row['id'], fecha=row['fecha'], estado=row['estado'])
+        except sqlite3.Error as e:
+            print(f"Error retrieving Hoja de Ruta: {e}")
+        finally:
+            HojaDeRuta.close_connection(conn)
+        return None
+
+class HojaDeRutaPedido(BaseModel):
+    def __init__(self, hoja_de_ruta_id, pedido_id, posicion=None, estado='on delivery', id=None):
+        self.id = id
+        self.hoja_de_ruta_id = hoja_de_ruta_id
+        self.pedido_id = pedido_id
+        self.posicion = posicion
+        self.estado = estado
+
+    def save(self):
+        """Save the HojaDeRutaPedido to the database."""
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        try:
+            if self.id:
+                cursor.execute('''
+                    UPDATE hojas_de_ruta_pedidos
+                    SET posicion = ?, estado = ?
+                    WHERE id = ?
+                ''', (self.posicion, self.estado, self.id))
+            else:
+                cursor.execute('''
+                    INSERT INTO hojas_de_ruta_pedidos (hoja_de_ruta_id, pedido_id, posicion, estado)
+                    VALUES (?, ?, ?, ?)
+                ''', (self.hoja_de_ruta_id, self.pedido_id, self.posicion, self.estado))
+                self.id = cursor.lastrowid
+            conn.commit()
+        except sqlite3.Error as e:
+            print(f"Error saving HojaDeRutaPedido: {e}")
+            conn.rollback()
+        finally:
+            self.close_connection(conn)
+
+    @staticmethod
+    def get_by_hoja_id(hoja_de_ruta_id):
+        """Retrieve all Pedidos for a specific Hoja de Ruta."""
+        conn = HojaDeRutaPedido.get_db_connection()
+        try:
+            rows = conn.execute('''
+                SELECT * FROM hojas_de_ruta_pedidos
+                WHERE hoja_de_ruta_id = ?
+                ORDER BY posicion ASC
+            ''', (hoja_de_ruta_id,)).fetchall()
+            return [HojaDeRutaPedido(
+                        hoja_de_ruta_id=row['hoja_de_ruta_id'],
+                        pedido_id=row['pedido_id'],
+                        posicion=row['posicion'],
+                        estado=row['estado'],
+                        id=row['id']
+                    ) for row in rows]
+        except sqlite3.Error as e:
+            print(f"Error retrieving HojaDeRutaPedidos: {e}")
+        finally:
+            HojaDeRutaPedido.close_connection(conn)
+        return []
+
+    @staticmethod
+    def get_by_pedido_id_and_hoja_id(pedido_id, hoja_de_ruta_id):
+        """Retrieve a specific Pedido in a Hoja de Ruta."""
+        conn = HojaDeRutaPedido.get_db_connection()
+        try:
+            row = conn.execute('''
+                SELECT * FROM hojas_de_ruta_pedidos
+                WHERE pedido_id = ? AND hoja_de_ruta_id = ?
+            ''', (pedido_id, hoja_de_ruta_id)).fetchone()
+            if row:
+                return HojaDeRutaPedido(
+                    hoja_de_ruta_id=row['hoja_de_ruta_id'],
+                    pedido_id=row['pedido_id'],
+                    posicion=row['posicion'],
+                    estado=row['estado'],
+                    id=row['id']
+                )
+        except sqlite3.Error as e:
+            print(f"Error retrieving HojaDeRutaPedido: {e}")
+        finally:
+            HojaDeRutaPedido.close_connection(conn)
+        return None
+
+    @staticmethod
+    def get_detalle_by_hoja_id(hoja_de_ruta_id):
+        """Retrieve detailed information for each Pedido in a Hoja de Ruta."""
+        conn = HojaDeRutaPedido.get_db_connection()
+        try:
+            detalles = conn.execute('''
+                SELECT * FROM hoja_de_ruta_detalle 
+                WHERE hoja_de_ruta_id = ?
+                ORDER BY posicion ASC
+            ''', (hoja_de_ruta_id,)).fetchall()
+            return detalles
+        except sqlite3.Error as e:
+            print(f"Error retrieving detailed hoja de ruta data: {e}")
+        finally:
+            HojaDeRutaPedido.close_connection(conn)
+        return []
+
