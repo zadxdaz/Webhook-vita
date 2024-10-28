@@ -760,7 +760,19 @@ class Transaction(BaseModel):
     def get_by_client_id(client_id):
         conn = Transaction.get_db_connection()
         try:
-            transactions = conn.execute('SELECT * FROM transactions WHERE client_id = ?', (client_id,)).fetchall()
+            # Fetch transactions from the database
+            rows = conn.execute('SELECT * FROM transactions WHERE client_id = ?', (client_id,)).fetchall()
+            
+            # Convert rows to Transaction objects
+            transactions = [
+                Transaction(
+                    id=row['id'],
+                    client_id=row['client_id'],
+                    amount=row['amount'],
+                    date=row['date'],
+                    description=row['description'],
+                ) for row in rows
+            ]
             return transactions
         except sqlite3.Error as e:
             print(f"Error retrieving transactions: {e}")
@@ -838,6 +850,19 @@ class HojaDeRuta(BaseModel):
         finally:
             HojaDeRuta.close_connection(conn)
         return None
+    
+    @staticmethod
+    def get_all():
+        """Retrieve all Hojas de Ruta from the database."""
+        conn = HojaDeRuta.get_db_connection()
+        try:
+            rows = conn.execute('SELECT * FROM hojas_de_ruta ORDER BY fecha DESC').fetchall()
+            return [HojaDeRuta(id=row['id'], fecha=row['fecha'], estado=row['estado']) for row in rows]
+        except sqlite3.Error as e:
+            print(f"Error retrieving all Hojas de Ruta: {e}")
+        finally:
+            HojaDeRuta.close_connection(conn)
+        return []
 
 class HojaDeRutaPedido(BaseModel):
     def __init__(self, hoja_de_ruta_id, pedido_id, posicion=None, estado='on delivery', id=None):
@@ -925,7 +950,6 @@ class HojaDeRutaPedido(BaseModel):
             detalles = conn.execute('''
                 SELECT * FROM hoja_de_ruta_detalle 
                 WHERE hoja_de_ruta_id = ?
-                ORDER BY posicion ASC
             ''', (hoja_de_ruta_id,)).fetchall()
             return detalles
         except sqlite3.Error as e:
@@ -933,4 +957,5 @@ class HojaDeRutaPedido(BaseModel):
         finally:
             HojaDeRutaPedido.close_connection(conn)
         return []
-
+    
+    

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Hojas de Ruta{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Hojas de Ruta</h1>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+            <thead class="thead-light">
+                <tr>
+                    <th>ID</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for hoja in hojas %}
+                <tr>
+                    <td>{{ hoja.id }}</td>
+                    <td>{{ hoja.fecha }}</td>
+                    <td>{{ hoja.estado }}</td>
+                    <td>
+                        <a href="{{ url_for('view_hoja_de_ruta', hoja_id=hoja.id) }}" class="btn btn-info btn-sm">Ver Detalles</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

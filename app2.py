@@ -561,7 +561,7 @@ def view_hoja_de_ruta(hoja_id):
         return redirect(url_for('view_hoja_de_ruta', hoja_id=hoja_id))
 
     # Fetch all pedidos in the hoja de ruta
-    pedidos = HojaDeRutaPedido.get_by_hoja_id(hoja_id)
+    pedidos = HojaDeRutaPedido.get_detalle_by_hoja_id(hoja_id)
 
     return render_template('hoja_de_ruta.html', hoja_de_ruta=hoja_de_ruta, pedidos=pedidos,form=form)
 
@@ -579,13 +579,21 @@ def mark_as_delivered(hoja_id, pedido_id):
             pedido = Pedido.get_by_id(pedido_id)
             pedido.update_estado('delivered')
 
+            deuda = Transaction(amount=-(pedido.total),client_id=pedido.cliente_id,date=datetime.now())
+            deuda.save()
+
             flash('Pedido marked as delivered!', 'success')
         else:
             flash('Pedido not found in the Hoja de Ruta.', 'error')
     
     return redirect(url_for('view_hoja_de_ruta', hoja_id=hoja_id))
 
-
+@app.route('/hojas-de-ruta', methods=['GET'])
+@handle_db_error
+def view_all_hojas_de_ruta():
+    """Display a list of all Hojas de Ruta."""
+    hojas = HojaDeRuta.get_all()  # Assuming get_all() retrieves all Hojas de Ruta
+    return render_template('hojas_de_ruta.html', hojas=hojas)
 
 if __name__ == '__main__':
     app.run(debug=True)

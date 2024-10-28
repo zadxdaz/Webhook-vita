@@ -89,12 +89,18 @@ CREATE TABLE IF NOT EXISTS hojas_de_ruta_pedidos (
 );
 
 CREATE VIEW hoja_de_ruta_detalle AS
-SELECT p.id AS pedido_id, c.nombre_completo AS cliente, pro.nombre AS producto, 
-       p.cantidad, c.direccion AS ubicacion, p.estado
+SELECT hdp.hoja_de_ruta_id,  -- Include hoja_de_ruta_id for filtering
+       p.id AS pedido_id, 
+       c.nombre_completo AS cliente, 
+       pro.nombre AS producto, 
+       p.cantidad, 
+       c.direccion AS ubicacion, 
+       p.estado
 FROM hojas_de_ruta_pedidos hdp
 JOIN pedidos p ON hdp.pedido_id = p.id
 JOIN clientes c ON p.cliente_id = c.id
 JOIN productos pro ON p.producto_id = pro.id;
+
 
 
 """
