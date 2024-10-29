@@ -75,6 +75,11 @@ class Cliente(Base):
         session.close()
         return cliente
 
+    def get_balance(self):
+        transactions = Transaction.get_by_client_id(self.id)
+        balance = sum([t.amount for t in transactions])  # Sum the 'amount' field in all transactions
+        return balance
+
     @staticmethod
     def search_by_name(name):
         session = Session()
