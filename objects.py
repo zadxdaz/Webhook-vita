@@ -344,6 +344,13 @@ class ClientesList(Base):
         session.close()
         return listas
 
+    @staticmethod
+    def get_by_id(lista_id):
+        session = Session()
+        lista = session.query(ClientesList).filter_by(id=lista_id).first()
+        session.close()
+        return lista
+
 class ClientesListEntry(Base):
     __tablename__ = 'clientes_listas'
 
@@ -384,6 +391,14 @@ class Transaction(Base):
         debts = session.query(Transaction).filter(Transaction.amount < 0, Transaction.date < date).all()
         session.close()
         return debts
+    
+    @staticmethod
+    def get_all():
+        session = Session()
+        transactions = session.query(Transaction).all()
+        session.close()
+        return transactions
+
 
 class HojaDeRuta(Base):
     __tablename__ = 'hojas_de_ruta'
@@ -409,6 +424,14 @@ class HojaDeRuta(Base):
         hojas = session.query(HojaDeRuta).order_by(HojaDeRuta.fecha.desc()).all()
         session.close()
         return hojas
+    
+    @staticmethod
+    def get_by_id(hoja_id):
+        session = Session()
+        hoja = session.query(HojaDeRuta).filter_by(id=hoja_id).first()
+        session.close()
+        return hoja
+
 
 class HojaDeRutaPedido(Base):
     __tablename__ = 'hojas_de_ruta_pedidos'
@@ -436,6 +459,23 @@ class HojaDeRutaPedido(Base):
         pedidos = session.query(HojaDeRutaPedido).filter_by(hoja_de_ruta_id=hoja_de_ruta_id).order_by(HojaDeRutaPedido.posicion).all()
         session.close()
         return pedidos
+
+    @staticmethod
+    def get_by_pedido_id_and_hoja_id(pedido_id, hoja_de_ruta_id):
+        session = Session()
+        entry = session.query(HojaDeRutaPedido).filter_by(
+            pedido_id=pedido_id, hoja_de_ruta_id=hoja_de_ruta_id
+        ).first()
+        session.close()
+        return entry
+    
+    @staticmethod
+    def get_detalle_by_hoja_id(hoja_de_ruta_id):
+        session = Session()
+        detalles = session.query(HojaDeRutaPedido).filter_by(hoja_de_ruta_id=hoja_de_ruta_id).all()
+        session.close()
+        return detalles
+
 
 
 class Bot:
