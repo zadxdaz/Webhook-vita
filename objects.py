@@ -4,6 +4,12 @@ from sqlalchemy.exc import SQLAlchemyError
 import os
 from dotenv import load_dotenv
 
+from sqlalchemy import Column, Integer, String, ForeignKey, Float, Text, DateTime, Enum, UniqueConstraint
+from sqlalchemy.orm import relationship
+from sqlalchemy.exc import SQLAlchemyError
+from datetime import datetime
+
+
 # Load environment variables
 load_dotenv()
 DATABASE = os.getenv('DATABASE', 'sqlite:///vita.db')
@@ -18,10 +24,10 @@ class Cliente(Base):
     __tablename__ = 'clientes'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    nombre_completo = Column(String, nullable=False)
-    celular = Column(String, nullable=False, unique=True)
-    direccion = Column(String, nullable=False)
-    estado_conversacion = Column(String, nullable=True)
+    nombre_completo = Column(String(255), nullable=False)  # Specify length
+    celular = Column(String(20), nullable=False, unique=True)
+    direccion = Column(String(255), nullable=False)
+    estado_conversacion = Column(String(50), nullable=True)
     producto_seleccionado = Column(Integer, ForeignKey('productos.id'), nullable=True)
     
     def save(self):
@@ -79,7 +85,7 @@ class Producto(Base):
     __tablename__ = 'productos'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    nombre = Column(String, nullable=False)
+    nombre = Column(String(255), nullable=False)  # Specify length for VARCHAR
     descripcion = Column(Text, nullable=True)
     precio = Column(Float, nullable=False)
 
@@ -228,20 +234,16 @@ class Pedido(Base):
         session.close()
         return pedidos
 
-from sqlalchemy import Column, Integer, String, ForeignKey, Float, Text, DateTime, Enum, UniqueConstraint
-from sqlalchemy.orm import relationship
-from sqlalchemy.exc import SQLAlchemyError
-from datetime import datetime
 
 class Mensaje(Base):
     __tablename__ = 'mensajes'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    whatsapp_id = Column(String, nullable=False)
+    whatsapp_id = Column(String(20), nullable=False)
     message = Column(Text, nullable=False)
-    direction = Column(String, nullable=False)  # 'sent' or 'received'
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    message_type = Column(String, nullable=False)  # 'text', 'image', etc.
+    direction = Column(String(10), nullable=False)  # e.g., 'sent' or 'received'
+    timestamp = Column(DateTime, default=datetime.now)
+    message_type = Column(String(50), nullable=False)  # e.g., 'text', 'image'
 
     def exists_in_db(self):
         session = Session()
@@ -276,7 +278,7 @@ class ClientesList(Base):
     __tablename__ = 'listas'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    nombre = Column(String, nullable=False)
+    nombre = Column(String(255), nullable=False)  # Specify length
 
     def save(self):
         session = Session()
