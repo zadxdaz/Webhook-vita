@@ -5,7 +5,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_wtf import FlaskForm
 from wtforms import StringField,SubmitField
 from wtforms.validators import DataRequired, Length
-from objetos2 import *
+from objects import *
 import functools
 from datetime import datetime,timedelta
 
