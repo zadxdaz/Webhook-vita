@@ -178,10 +178,10 @@ def nuevo_producto():
         precio = request.form['precio']
         
 
-        producto = Producto(nombre=nombre, descripcion=descripcion, precio=precio,form=form)
+        producto = Producto(nombre=nombre, descripcion=descripcion, precio=precio)
         producto.save()
         return redirect(url_for('productos'), 302)
-    return render_template('nuevo_producto.html'), 200
+    return render_template('nuevo_producto.html',form=form), 200
 
 @app.route('/editar_producto/<int:id>', methods=['GET', 'POST'])
 @handle_db_error
