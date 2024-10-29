@@ -157,7 +157,7 @@ class Pedido(Base):
         producto = session.query(Producto).filter_by(id=self.producto_id).first()
         session.close()
         if producto:
-            self.total = producto.precio * self.cantidad
+            self.total = float(producto.precio) * int(self.cantidad)
 
     def save(self):
         self.calculate_total()
@@ -241,7 +241,7 @@ class Pedido(Base):
         finally:
             session.close()
 
-            
+
     @staticmethod
     def get_unique_states():
         session = Session()
