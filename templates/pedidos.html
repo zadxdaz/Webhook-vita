@@ -53,8 +53,9 @@
                     <tr>
                         <td>
                             <!-- Checkbox to select Pedido for Hoja de Ruta -->
-                            <input type="checkbox" name="pedido_id" value="{{ pedido.id }}" class="pedido-checkbox"
-                                {% if pedido.estado != 'pendiente' %}disabled{% endif %}>
+                            <input type="checkbox" name="pedido_id" value="{{ pedido.pedido_id }}" class="pedido-checkbox"
+       {% if pedido.estado != 'pendiente' %}disabled{% endif %}>
+
                         </td>
                         <td>{{ pedido.id }}</td>
                         <td>{{ pedido.cliente }}</td>
@@ -65,6 +66,7 @@
                         <td>
                             <!-- Edit button (separate link) -->
                             <a href="{{ url_for('editar_pedido', id=pedido.pedido_id) }}" class="btn btn-warning btn-sm">Editar</a>
+
 
                             <!-- Delete button triggers a JS function, no need for a form -->
                             <button type="button" class="btn btn-danger btn-sm" onclick="deletePedido({{ pedido.id }})">Eliminar</button>
