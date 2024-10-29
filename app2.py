@@ -171,12 +171,14 @@ def productos():
 @app.route('/nuevo_producto', methods=['GET', 'POST'])
 @handle_db_error
 def nuevo_producto():
+    form = EmptyForm()
     if request.method == 'POST':
         nombre = request.form['nombre']
         descripcion = request.form['descripcion']
         precio = request.form['precio']
+        
 
-        producto = Producto(nombre=nombre, descripcion=descripcion, precio=precio)
+        producto = Producto(nombre=nombre, descripcion=descripcion, precio=precio,form=form)
         producto.save()
         return redirect(url_for('productos'), 302)
     return render_template('nuevo_producto.html'), 200
