@@ -8,6 +8,8 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Float, Text, DateTim
 from sqlalchemy.orm import relationship
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
+import requests
+import time
 
 
 # Load environment variables
@@ -430,6 +432,158 @@ class HojaDeRutaPedido(Base):
         session.close()
         return pedidos
 
+
+class Bot:
+    def __init__(self, api_key, phone_number_id):
+        self.api_key = api_key
+        self.phone_number_id = phone_number_id
+        self.headers = {
+            'Authorization': f'Bearer {self.api_key}',
+            'Content-Type': 'application/json'
+        }
+
+    def parse_text(self,data):
+        if data['type'] == 'interactive' and data['interactive']['type'] == 'button_reply':
+            text = data['interactive']['button_reply']['title']
+        elif data['type'] == 'button':
+            text = data['button']['text']
+        else:
+            text = data['text']['body']  # Texto del mensaje
+
+        return text
+
+    def parse_number(self,number):
+        if number[:3] == "549":
+            test = number[:2]
+            aux = number[3:]
+            number=test + aux
+        return number
+
+    def enviar_saludo(self, cliente:Cliente):
+        url = f"https://graph.facebook.com/v20.0/{self.phone_number_id}/messages"
+        # Enviar un mensaje de saludo con opciones de productos
+        saludo_template = {
+            "messaging_product": "whatsapp",
+            "to": cliente.celular,
+            "type": "template",
+            "template": {
+                "name": "saludo",
+                "language": {"code": "es_AR"},
+            }
+        }
+        timestamp = int(time.time())
+        print(cliente.celular)
+        try:
+            response = requests.post(url, headers=self.headers, json=saludo_template)
+            if response.status_code == 200:
+                # Log the sent message to the database
+                
+                message = Mensaje(
+                    whatsapp_id=cliente.celular,
+                    message="saludo",
+                    direction='sent',
+                    timestamp=timestamp,
+                    message_type='text'
+                )
+                message.save()
+                cliente.estado_conversacion = "esperando_producto"
+                cliente.save()
+                return response.json()
+            else:
+                print(f"Error: {response.status_code} - {response.text}")
+                return None
+        except requests.RequestException as e:
+            print(f"HTTP Request failed: {e}")
+            return None
+
+    def enviar_mensaje(self, celular, mensaje):
+        """Send a message to the WhatsApp API and log it in the database."""
+        url = f"https://graph.facebook.com/v20.0/{self.phone_number_id}/messages"
+        data = {
+            "messaging_product": "whatsapp",
+            "to": celular,  # Phone number with country code, without leading '+'
+            "type": "text",
+            "text": {
+                "body": mensaje
+            }
+        }
+        timestamp = int(time.time())
+        try:
+            response = requests.post(url, headers=self.headers, json=data)
+            if response.status_code == 200:
+                # Log the sent message to the database
+                message = Mensaje(
+                    whatsapp_id=celular,
+                    message=mensaje,
+                    direction='sent',
+                    timestamp=timestamp,
+                    message_type='text'
+                )
+                message.save()
+                return response.json()
+            else:
+                print(f"Error: {response.status_code} - {response.text}")
+                return None
+        except requests.RequestException as e:
+            print(f"HTTP Request failed: {e}")
+            return None
+
+    def procesar_mensaje(self, data):
+        # Procesar la respuesta del cliente
+        if 'messages' in data['entry'][0]['changes'][0]['value']:
+            message_data = data['entry'][0]['changes'][0]['value']['messages'][0]
+            phone_number = self.parse_number(message_data['from'])
+            message_text = self.parse_text(message_data)
+            timestamp = message_data['timestamp']
+
+            # Log the received message to the database
+            message = Mensaje(
+                whatsapp_id=phone_number,
+                message=message_text,
+                direction='received',
+                timestamp=timestamp,
+                message_type='text'
+            )
+            message.save()
+            print(f"Received message from {phone_number}: {message_text}")
+
+            # Buscar cliente por su número de celular
+            cliente = Cliente.obtener_por_celular(phone_number)
+            if cliente:
+                if cliente.estado_conversacion == "esperando_producto":
+                    producto = Producto.get_by_nombre(message_text)
+                    if producto:
+                        self.preguntar_cantidad(cliente, message_text)
+                elif cliente.estado_conversacion == "esperando_cantidad":
+                    self.confirmar_pedido(cliente, message_text)
+            
+
+    def preguntar_cantidad(self, cliente:Cliente, producto_nombre):
+        # Actualizar el estado del cliente a "esperando_cantidad"
+        producto = Producto.get_by_nombre(producto_nombre)
+        cliente.producto_seleccionado = producto.id
+        cliente.estado_conversacion = "esperando_cantidad"
+        cliente.save()
+
+        mensaje = f"¿Cuántos {producto.nombre} te gustaría ordenar?"
+        print(mensaje)
+        self.enviar_mensaje(cliente.celular,mensaje)
+
+    def confirmar_pedido(self, cliente:Cliente, cantidad):
+        # Crear un pedido en el sistema
+        pedido =Pedido(cliente.id, cliente.producto_seleccionado, cantidad)
+        pedido.save()
+
+        producto = Producto.get_by_id(pedido.producto_id)
+
+        # Enviar confirmación al cliente
+        mensaje =  f"Gracias {cliente.nombre_completo}, tu pedido de {cantidad} {producto.nombre}(s) ha sido registrado."
+        self.enviar_mensaje(cliente.celular,mensaje)
+
+        # Resetear el estado de la conversación del cliente
+        cliente.estado_conversacion = None
+        cliente.producto_seleccionado = None
+        cliente.save()
 
 # Creating tables
 Base.metadata.create_all(engine)
