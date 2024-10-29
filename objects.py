@@ -199,34 +199,49 @@ class Pedido(Base):
     @staticmethod
     def get_vista(state=None, search=None):
         session = Session()
-        query = session.query(
-            Pedido.id.label('pedido_id'),
-            Cliente.nombre_completo.label('cliente'),
-            Producto.nombre.label('producto'),
-            Pedido.cantidad,
-            Pedido.estado,
-            (Pedido.cantidad * Producto.precio).label('total')
-        ).join(Cliente).join(Producto)
+        try:
+            # Start query with Pedido and explicitly join Cliente and Producto
+            query = (
+                session.query(
+                    Pedido.id.label('pedido_id'),
+                    Cliente.nombre_completo.label('cliente'),
+                    Producto.nombre.label('producto'),
+                    Pedido.cantidad,
+                    Pedido.estado,
+                    (Pedido.cantidad * Producto.precio).label('total')
+                )
+                .select_from(Pedido)  # Start with Pedido as the FROM clause
+                .join(Cliente, Pedido.cliente_id == Cliente.id)  # Explicitly join Cliente on foreign key
+                .join(Producto, Pedido.producto_id == Producto.id)  # Explicitly join Producto on foreign key
+            )
 
-        if state:
-            query = query.filter(Pedido.estado == state)
-        if search:
-            query = query.filter(Cliente.nombre_completo.ilike(f'%{search}%'))
+            # Add filtering by state if provided
+            if state:
+                query = query.filter(Pedido.estado == state)
 
-        rows = query.all()
-        session.close()
-        return [
-            {
-                'pedido_id': row.pedido_id,
-                'cliente': row.cliente,
-                'producto': row.producto,
-                'cantidad': row.cantidad,
-                'estado': row.estado,
-                'total': row.total
-            }
-            for row in rows
-        ]
+            # Filter by client name if a search term is provided
+            if search:
+                query = query.filter(Cliente.nombre_completo.ilike(f'%{search}%'))
 
+            # Execute query and fetch results
+            rows = query.all()
+            return [
+                {
+                    'pedido_id': row.pedido_id,
+                    'cliente': row.cliente,
+                    'producto': row.producto,
+                    'cantidad': row.cantidad,
+                    'estado': row.estado,
+                    'total': row.total
+                }
+                for row in rows
+            ]
+        except SQLAlchemyError as e:
+            print(f"Error retrieving pedidos vista: {e}")
+        finally:
+            session.close()
+
+            
     @staticmethod
     def get_unique_states():
         session = Session()
