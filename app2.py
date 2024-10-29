@@ -206,12 +206,22 @@ def eliminar_producto(id):
         producto.delete()
     return redirect(url_for('productos'), 302)
 
-@app.route('/pedidos')
+@app.route('/pedidos', methods=['GET', 'POST'])
 @handle_db_error
 def pedidos():
     form = EmptyForm()
-    pedidos = Pedido.get_vista()
-    return render_template('pedidos.html', pedidos=pedidos, form=form), 200
+    state_filter = request.args.get('state', 'pendiente')  # Default to 'pendiente'
+    search_query = request.args.get('search', '').strip()  # Optional search query
+    
+    # Fetch pedidos based on the filters
+    pedidos = Pedido.get_vista(state=state_filter, search=search_query)
+    
+    # Get unique states for dropdown filter options
+    all_states = Pedido.get_unique_states()
+    
+    return render_template('pedidos.html', pedidos=pedidos, form=form, 
+                           state_filter=state_filter, search_query=search_query,
+                           all_states=all_states), 200
 
 @app.route('/nuevo_pedido', methods=['GET', 'POST'])
 @handle_db_error
@@ -594,6 +604,29 @@ def view_all_hojas_de_ruta():
     """Display a list of all Hojas de Ruta."""
     hojas = HojaDeRuta.get_all()  # Assuming get_all() retrieves all Hojas de Ruta
     return render_template('hojas_de_ruta.html', hojas=hojas)
+
+@app.route('/hoja-de-ruta/<int:hoja_id>/pedido/<int:pedido_id>/cancelar', methods=['POST'])
+@handle_db_error
+def mark_as_canceled(hoja_id, pedido_id):
+    form = EmptyForm()
+    if form.validate_on_submit():
+        hoja_pedido = HojaDeRutaPedido.get_by_pedido_id_and_hoja_id(pedido_id, hoja_id)
+        if hoja_pedido:
+            # Update the HojaDeRutaPedido and Pedido statuses to 'canceled'
+            hoja_pedido.estado = 'canceled'
+            hoja_pedido.save()
+
+            pedido = Pedido.get_by_id(pedido_id)
+            pedido.update_estado('canceled')
+
+            # Optional: Add logic for reversing or logging the canceled order
+            flash('Pedido has been canceled.', 'success')
+        else:
+            flash('Pedido not found in the Hoja de Ruta.', 'error')
+    
+    return redirect(url_for('view_hoja_de_ruta', hoja_id=hoja_id))
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)

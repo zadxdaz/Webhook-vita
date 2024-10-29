@@ -1,17 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}Hoja de Ruta{% endblock %}
+{% block title %}Hoja de Ruta Detalle{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
     <h1 class="mb-4">Hoja de Ruta #{{ hoja_de_ruta.id }}</h1>
+    <p><strong>Fecha:</strong> {{ hoja_de_ruta.fecha }}</p>
+    <p><strong>Estado:</strong> {{ hoja_de_ruta.estado }}</p>
 
     <!-- Table of Pedidos in the Hoja de Ruta -->
     <div class="table-responsive">
         <table class="table table-bordered table-striped">
             <thead class="thead-light">
                 <tr>
-                    <th>ID</th>
+                    <th>ID Pedido</th>
                     <th>Cliente</th>
                     <th>Producto</th>
                     <th>Cantidad</th>
@@ -30,11 +32,17 @@
                     <td>{{ pedido.ubicacion }}</td>
                     <td>{{ pedido.estado }}</td>
                     <td>
-                        <!-- Mark as delivered button -->
+                        <!-- Mark as Delivered button -->
                         {% if pedido.estado == 'on delivery' %}
                         <form action="{{ url_for('mark_as_delivered', pedido_id=pedido.pedido_id, hoja_id=hoja_de_ruta.id) }}" method="POST" style="display:inline;">
                             {{ form.hidden_tag() }}
                             <button type="submit" class="btn btn-success btn-sm">Entregado</button>
+                        </form>
+
+                        <!-- Cancel button -->
+                        <form action="{{ url_for('mark_as_canceled', pedido_id=pedido.pedido_id, hoja_id=hoja_de_ruta.id) }}" method="POST" style="display:inline;">
+                            {{ form.hidden_tag() }}
+                            <button type="submit" class="btn btn-danger btn-sm">Cancelar</button>
                         </form>
                         {% endif %}
                     </td>

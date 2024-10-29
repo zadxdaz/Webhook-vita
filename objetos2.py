@@ -328,23 +328,69 @@ class Pedido(BaseModel):
             Pedido.close_connection(conn)
         return []
 
-    @staticmethod
-    def get_vista():
-        """Retrieve a detailed view of Pedidos, including client names and product details."""
+    def get_vista(state=None, search=None):
         conn = Pedido.get_db_connection()
         try:
-            pedidos = conn.execute('''
-                SELECT c.nombre_completo as nombre, pro.nombre as producto, p.cantidad as cantidad, p.estado as estado, p.id as id, pro.precio * p.cantidad as total
-                FROM pedidos AS p
-                JOIN clientes AS c ON p.cliente_id = c.id
-                JOIN productos AS pro ON p.producto_id = pro.id
-            ''').fetchall()
-            return pedidos
+            # Base query with joins to fetch relevant information for each Pedido
+            query = """
+                SELECT p.id AS pedido_id, 
+                       c.nombre_completo AS cliente, 
+                       pro.nombre AS producto, 
+                       p.cantidad, 
+                       p.estado, 
+                       p.cantidad * pro.precio AS total
+                FROM pedidos p
+                JOIN clientes c ON p.cliente_id = c.id
+                JOIN productos pro ON p.producto_id = pro.id
+                WHERE 1 = 1
+            """
+            params = []
+
+            # Filter by state if specified
+            if state:
+                query += " AND p.estado = ?"
+                params.append(state)
+
+            # Filter by client name if search is provided
+            if search:
+                query += " AND c.nombre_completo LIKE ?"
+                params.append(f'%{search}%')
+
+            # Execute the query and fetch all rows
+            rows = conn.execute(query, params).fetchall()
+
+            # Convert each row to a dictionary
+            return [
+                {
+                    'pedido_id': row['pedido_id'],
+                    'cliente': row['cliente'],
+                    'producto': row['producto'],
+                    'cantidad': row['cantidad'],
+                    'estado': row['estado'],
+                    'total': row['total']
+                }
+                for row in rows
+            ]
         except sqlite3.Error as e:
-            print(f"Error retrieving pedido vista: {e}")
+            print(f"Error retrieving pedidos: {e}")
         finally:
             Pedido.close_connection(conn)
         return []
+    
+    
+    @staticmethod
+    def get_unique_states():
+        """Retrieve unique states for the dropdown filter."""
+        conn = Pedido.get_db_connection()
+        try:
+            states = conn.execute("SELECT DISTINCT estado FROM pedidos").fetchall()
+            return [row['estado'] for row in states]
+        except sqlite3.Error as e:
+            print(f"Error retrieving unique states: {e}")
+        finally:
+            Pedido.close_connection(conn)
+        return []
+
 
     @staticmethod
     def get_by_estado(estado):

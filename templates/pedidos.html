@@ -9,6 +9,26 @@
     <!-- Button to add a new order -->
     <a href="{{ url_for('nuevo_pedido') }}" class="btn btn-primary mb-3">Agregar Pedido</a>
 
+    <!-- Search and Filter Form -->
+    <form method="GET" action="{{ url_for('pedidos') }}" class="form-inline mb-3">
+        <!-- State Filter Dropdown -->
+        <label for="state" class="mr-2">Estado:</label>
+        <select name="state" id="state" class="form-control mr-3">
+            <option value="">Todos</option>
+            {% for state in all_states %}
+            <option value="{{ state }}" {% if state == state_filter %}selected{% endif %}>{{ state }}</option>
+            {% endfor %}
+        </select>
+
+        <!-- Search Input -->
+        <label for="search" class="mr-2">Buscar Cliente:</label>
+        <input type="text" name="search" id="search" class="form-control mr-3" placeholder="Nombre del Cliente"
+               value="{{ search_query }}">
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn btn-primary">Buscar</button>
+    </form>
+
     <!-- Form to select Pedidos for Hoja de Ruta creation -->
     <form id="hoja-ruta-form" action="{{ url_for('create_hoja_de_ruta') }}" method="POST">
         {{ form.hidden_tag() }}
@@ -37,14 +57,14 @@
                                 {% if pedido.estado != 'pendiente' %}disabled{% endif %}>
                         </td>
                         <td>{{ pedido.id }}</td>
-                        <td>{{ pedido.nombre }}</td>
+                        <td>{{ pedido.cliente }}</td>
                         <td>{{ pedido.producto }}</td>
                         <td>{{ pedido.cantidad }}</td>
                         <td>{{ pedido.estado }}</td>
                         <td>{{ pedido.total }}</td>
                         <td>
                             <!-- Edit button (separate link) -->
-                            <a href="{{ url_for('editar_pedido', id=pedido.id) }}" class="btn btn-warning btn-sm">Editar</a>
+                            <a href="{{ url_for('editar_pedido', id=pedido.pedido_id) }}" class="btn btn-warning btn-sm">Editar</a>
 
                             <!-- Delete button triggers a JS function, no need for a form -->
                             <button type="button" class="btn btn-danger btn-sm" onclick="deletePedido({{ pedido.id }})">Eliminar</button>
@@ -64,24 +84,22 @@
 <script>
     function deletePedido(pedidoId) {
         if (confirm('¿Estás seguro de que deseas eliminar este pedido?')) {
-            // Create a form dynamically to submit the DELETE request
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = `/eliminar_pedido/${pedidoId}`;
 
-            // Add CSRF token to the form (this assumes you're passing the token via a global JS variable)
             const csrfTokenInput = document.createElement('input');
             csrfTokenInput.type = 'hidden';
             csrfTokenInput.name = 'csrf_token';
-            csrfTokenInput.value = '{{ csrf_token() }}';  // Assuming CSRF is passed like this
+            csrfTokenInput.value = '{{ csrf_token() }}';
             form.appendChild(csrfTokenInput);
 
-            document.body.appendChild(form);  // Add form to the document
-            form.submit();  // Submit the form
+            document.body.appendChild(form);
+            form.submit();
         }
     }
 
-    // Handle enabling the "Create Hoja de Ruta" button based on selected Pedidos
+    // Enable "Create Hoja de Ruta" button based on selected Pedidos
     const createHojaBtn = document.getElementById('create-hoja-btn');
     const checkboxes = document.querySelectorAll('.pedido-checkbox');
 
