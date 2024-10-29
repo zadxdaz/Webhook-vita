@@ -139,7 +139,7 @@ class Pedido(Base):
     cliente_id = Column(Integer, ForeignKey('clientes.id'), nullable=False)
     producto_id = Column(Integer, ForeignKey('productos.id'), nullable=False)
     cantidad = Column(Integer, nullable=False)
-    estado = Column(String, nullable=False, default='pending')
+    estado = Column(String(255), nullable=False, default='pending')
     total = Column(Float, nullable=False)
 
     cliente = relationship("Cliente")
@@ -383,7 +383,7 @@ class HojaDeRuta(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     fecha = Column(DateTime, default=datetime.utcnow)
-    estado = Column(String, default='on delivery')
+    estado = Column(String(255), default='on delivery')
 
     def save(self):
         session = Session()
@@ -410,7 +410,7 @@ class HojaDeRutaPedido(Base):
     hoja_de_ruta_id = Column(Integer, ForeignKey('hojas_de_ruta.id'), nullable=False)
     pedido_id = Column(Integer, ForeignKey('pedidos.id'), nullable=False)
     posicion = Column(Integer, nullable=True)
-    estado = Column(String, default='on delivery')
+    estado = Column(String(255), default='on delivery')
 
     def save(self):
         session = Session()
