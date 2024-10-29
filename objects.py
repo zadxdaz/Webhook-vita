@@ -351,6 +351,18 @@ class ClientesList(Base):
         session.close()
         return lista
 
+    def get_clientes(self):
+        """Retrieve all clients in the list."""
+        session = Session()
+        try:
+            clientes = session.query(Cliente).join(ClientesListEntry).filter(ClientesListEntry.lista_id == self.id).all()
+            return clientes
+        except SQLAlchemyError as e:
+            print(f"Error retrieving clients in list: {e}")
+        finally:
+            session.close()
+
+
 class ClientesListEntry(Base):
     __tablename__ = 'clientes_listas'
 
