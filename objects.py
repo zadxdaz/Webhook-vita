@@ -16,7 +16,7 @@ load_dotenv()
 DATABASE = os.getenv('DATABASE', 'sqlite:///vita.db')
 
 # Set up SQLAlchemy engine and session
-engine = create_engine(DATABASE,connect_args={'connect_timeout':10})
+engine = create_engine(DATABASE,connect_args={'connect_timeout':10},pool_recycle=280)
 Session = sessionmaker(bind=engine)
 
 Base = declarative_base()
