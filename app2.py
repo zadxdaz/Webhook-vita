@@ -501,7 +501,10 @@ def create_hoja_de_ruta():
         return redirect(url_for('pedidos'))
 
     # Create a new Hoja de Ruta (Delivery Route)
+    session =db.session()
     hoja_de_ruta = HojaDeRuta()
+    session.add(hoja_de_ruta)
+    session.commit()
       # Save to DB to get the new hoja_de_ruta.id
 
     # Add the selected pedidos to the Hoja de Ruta with the status 'on delivery'
@@ -518,7 +521,7 @@ def create_hoja_de_ruta():
         pedido = Pedido.get_by_id(pedido_id)
         pedido.estado = 'on delivery'
         pedido.save()
-    hoja_de_ruta.save()
+    session.close()
     flash('Hoja de Ruta created successfully!', 'success')
     return redirect(url_for('view_hoja_de_ruta', hoja_id=hoja_de_ruta.id))
 
