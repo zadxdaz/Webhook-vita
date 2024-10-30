@@ -432,7 +432,7 @@ class HojaDeRuta(Base):
     __tablename__ = 'hojas_de_ruta'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    fecha = Column(DateTime, default=datetime.utcnow)
+    fecha = Column(DateTime, default=datetime.now)
     estado = Column(String(255), default='on delivery')
 
     def save(self):

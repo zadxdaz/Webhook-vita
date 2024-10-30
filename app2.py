@@ -34,11 +34,6 @@ class ClientListForm(FlaskForm):
     nombre = StringField('List Name', validators=[DataRequired(), Length(min=2, max=100)])
     submit = SubmitField('Create List')
 
-@app.teardown_appcontext
-def close_db_connection(exception):
-    db = g.pop('db', None)
-    if db is not None:
-        db.close()
 
 # Error handler
 def handle_db_error(func):
@@ -507,7 +502,7 @@ def create_hoja_de_ruta():
 
     # Create a new Hoja de Ruta (Delivery Route)
     hoja_de_ruta = HojaDeRuta()
-    hoja_de_ruta.save()  # Save to DB to get the new hoja_de_ruta.id
+      # Save to DB to get the new hoja_de_ruta.id
 
     # Add the selected pedidos to the Hoja de Ruta with the status 'on delivery'
     for index, pedido_id in enumerate(pedidos_ids):
@@ -523,7 +518,7 @@ def create_hoja_de_ruta():
         pedido = Pedido.get_by_id(pedido_id)
         pedido.estado = 'on delivery'
         pedido.save()
-
+    hoja_de_ruta.save()
     flash('Hoja de Ruta created successfully!', 'success')
     return redirect(url_for('view_hoja_de_ruta', hoja_id=hoja_de_ruta.id))
 
