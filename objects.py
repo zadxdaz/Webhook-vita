@@ -500,9 +500,24 @@ class HojaDeRutaPedido(Base):
     @staticmethod
     def get_detalle_by_hoja_id(hoja_de_ruta_id):
         session = Session()
-        detalles = session.query(HojaDeRutaPedido).filter_by(hoja_de_ruta_id=hoja_de_ruta_id).all()
+        #detalles = session.query(HojaDeRutaPedido).filter_by(hoja_de_ruta_id=hoja_de_ruta_id).all()
+
+        query = (
+            session.query(
+                Pedido.id.label('pedido_id'),
+                Cliente.nombre_completo.label('cliente'),
+                Producto.nombre.label('producto'),
+                Pedido.cantidad,
+                Pedido.estado,
+                Cliente.direccion.label('ubicacion')
+            )
+            .select_from(Pedido)  # Start with Pedido as the FROM clause
+            .join(Cliente, Pedido.cliente_id == Cliente.id)  # Explicitly join Cliente on foreign key
+            .join(Producto, Pedido.producto_id == Producto.id)  # Explicitly join Producto on foreign key
+        ).filter_by(hoja_de_ruta_id=hoja_de_ruta_id)
+
         session.close()
-        return detalles
+        return query
 
 
 
