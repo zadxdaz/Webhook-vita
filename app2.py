@@ -624,4 +624,6 @@ def mark_as_canceled(hoja_id, pedido_id):
 
 if __name__ == '__main__':
     app.run(debug=True)
-    db.init_app(app)
+    
+
+db.init_app(app)
