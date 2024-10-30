@@ -16,17 +16,18 @@ import MySQLdb
 # Load environment variables
 load_dotenv()
 DATABASE = os.getenv('DATABASE', 'sqlite:///vita.db')
+ENVIROMENT = os.getenv("ENVIROMENT")
 
-
-if __name__ == '__main__':
-    with sshtunnel.SSHTunnelForwarder(
+if ENVIROMENT == 'Debug':
+    tunnel = sshtunnel.SSHTunnelForwarder(
         ('ssh.pythonanywhere.com'),
         ssh_username='zadxdaz', ssh_password='Ickkdbbi2p2.',
         remote_bind_address=('zadxdaz.mysql.pythonanywhere-services.com', 3306)
-    ) as tunnel:
-        engine = create_engine('mysql://zadxdaz:sqlvitamovil@127.0.0.1:%s/zadxdaz$test' %tunnel.local_bind_port,connect_args={'connect_timeout':10},pool_recycle=280)
+    )
+    tunnel.start()
+    engine = create_engine('mysql://zadxdaz:sqlvitamovil@127.0.0.1:%s/zadxdaz$test' %tunnel.local_bind_port,connect_args={'connect_timeout':10},pool_recycle=280)
 else:
-    engine = create_engine(DATABASE,connect_args={'connect_timeout':10},pool_recycle=280)
+   engine = create_engine(DATABASE,connect_args={'connect_timeout':10},pool_recycle=280)
 # Set up SQLAlchemy engine and session
 
 Session = sessionmaker(bind=engine)
