@@ -11,13 +11,12 @@ from datetime import datetime
 import requests
 import time
 
-
 # Load environment variables
 load_dotenv()
 DATABASE = os.getenv('DATABASE', 'sqlite:///vita.db')
 
 # Set up SQLAlchemy engine and session
-engine = create_engine(DATABASE, echo=True)
+engine = create_engine(DATABASE,echo=True,connect_args=('connect_timeout':10))
 Session = sessionmaker(bind=engine)
 
 Base = declarative_base()
