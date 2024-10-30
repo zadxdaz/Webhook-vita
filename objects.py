@@ -8,15 +8,27 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Float, Text, DateTim
 from sqlalchemy.orm import relationship
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
+import sshtunnel
 import requests
 import time
+import MySQLdb
 
 # Load environment variables
 load_dotenv()
 DATABASE = os.getenv('DATABASE', 'sqlite:///vita.db')
 
+
+if __name__ == '__main__':
+    with sshtunnel.SSHTunnelForwarder(
+        ('ssh.pythonanywhere.com'),
+        ssh_username='zadxdaz', ssh_password='Ickkdbbi2p2.',
+        remote_bind_address=('zadxdaz.mysql.pythonanywhere-services.com', 3306)
+    ) as tunnel:
+        engine = create_engine('mysql://zadxdaz:sqlvitamovil@127.0.0.1:%s/zadxdaz$test' %tunnel.local_bind_port,connect_args={'connect_timeout':10},pool_recycle=280)
+else:
+    engine = create_engine(DATABASE,connect_args={'connect_timeout':10},pool_recycle=280)
 # Set up SQLAlchemy engine and session
-engine = create_engine(DATABASE,connect_args={'connect_timeout':10},pool_recycle=280)
+
 Session = sessionmaker(bind=engine)
 db = SQLAlchemy()
 
