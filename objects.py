@@ -20,7 +20,10 @@ engine = create_engine(DATABASE,connect_args={'connect_timeout':10},pool_recycle
 Session = sessionmaker(bind=engine)
 db = SQLAlchemy()
 
-Base = declarative_base(db.Model)
+#Base = declarative_base(db.Model)
+
+class Base(db.Model):
+    pass
 
 class Cliente(Base):
     __tablename__ = 'clientes'
