@@ -512,10 +512,11 @@ class HojaDeRutaPedido(Base):
                 Cliente.direccion.label('ubicacion')
             )
             .select_from(HojaDeRutaPedido) 
+            .filter_by(hoja_de_ruta_id=hoja_de_ruta_id)
             .join(Pedido, HojaDeRutaPedido.pedido_id == Pedido.id) # Start with HojaDeRutaPedido as the FROM clause
             .join(Cliente, Pedido.cliente_id == Cliente.id)  # Explicitly join Cliente on foreign key
             .join(Producto, Pedido.producto_id == Producto.id)  # Explicitly join Producto on foreign key
-        ).filter_by(hoja_de_ruta_id=hoja_de_ruta_id)
+        )
 
         session.close()
         return query
