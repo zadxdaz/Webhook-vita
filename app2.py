@@ -8,6 +8,7 @@ from wtforms.validators import DataRequired, Length
 from objects import *
 import functools
 from datetime import datetime,timedelta
+from flask_sqlalchemy import SQLAlchemy
 
 
 # Load sensitive data from environment variables
@@ -24,13 +25,7 @@ app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY')
 csrf = CSRFProtect(app)
 
 bot = Bot(KEY,PHONE_NUMBER_ID)
-
-# Database connection
-def get_db():
-    if 'db' not in g:
-        g.db = sqlite3.connect(DATABASE)
-        g.db.row_factory = sqlite3.Row
-    return g.db
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE
 
 class EmptyForm(FlaskForm):
     pass
@@ -632,3 +627,4 @@ def mark_as_canceled(hoja_id, pedido_id):
 
 if __name__ == '__main__':
     app.run(debug=True)
+    db.init_app(app)

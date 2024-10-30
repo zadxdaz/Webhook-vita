@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from sqlalchemy.exc import SQLAlchemyError
 import os
 from dotenv import load_dotenv
-
+from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, Integer, String, ForeignKey, Float, Text, DateTime, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.exc import SQLAlchemyError
@@ -18,8 +18,9 @@ DATABASE = os.getenv('DATABASE', 'sqlite:///vita.db')
 # Set up SQLAlchemy engine and session
 engine = create_engine(DATABASE,connect_args={'connect_timeout':10},pool_recycle=280)
 Session = sessionmaker(bind=engine)
+db = SQLAlchemy()
 
-Base = declarative_base()
+Base = declarative_base(db.Model)
 
 class Cliente(Base):
     __tablename__ = 'clientes'
@@ -657,4 +658,4 @@ class Bot:
         cliente.save()
 
 # Creating tables
-Base.metadata.create_all(engine)
+#Base.metadata.create_all(engine)
