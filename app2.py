@@ -6,6 +6,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField,SubmitField
 from wtforms.validators import DataRequired, Length
 from objects import *
+from objects import db
 import functools
 from datetime import datetime,timedelta
 from flask_sqlalchemy import SQLAlchemy
@@ -19,6 +20,7 @@ KEY = os.getenv("WHATSAPP_API_KEY")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
 WEBHOOK_VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN")
 DATABASE = os.getenv("DATABASE", "vita.db")
+ENVIRONMENT = os.getenv("ENVIROMENT")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY')
@@ -35,6 +37,26 @@ class ClientListForm(FlaskForm):
     submit = SubmitField('Create List')
 
 
+if ENVIRONMENT == 'Debug':
+    # Set up SSH tunnel for remote MySQL database access
+    print(2)
+    tunnel = sshtunnel.SSHTunnelForwarder(
+        ('ssh.pythonanywhere.com'),
+        ssh_username='zadxdaz',
+        ssh_password='Ickkdbbi2p2.',
+        remote_bind_address=('zadxdaz.mysql.pythonanywhere-services.com', 3306)
+    )
+    tunnel.start()
+
+    # Construct the database URI with the tunnel's local bind port
+    app.config["SQLALCHEMY_DATABASE_URI"] = f'mysql://zadxdaz:sqlvitamovil@127.0.0.1:{tunnel.local_bind_port}/zadxdaz$test'
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE
+
+
+
+init_app(app)
+    
 # Error handler
 def handle_db_error(func):
     @functools.wraps(func)
@@ -569,24 +591,30 @@ def view_hoja_de_ruta(hoja_id):
 
     return render_template('hoja_de_ruta.html', hoja_de_ruta=hoja_de_ruta, pedidos=pedidos,form=form)
 
-@app.route('/hoja-de-ruta/<int:hoja_id>/pedido/<int:pedido_id>/entregado', methods=['POST'])
-@handle_db_error
-def mark_as_delivered(hoja_id, pedido_id):
+@app.route('/hoja-de-ruta/<int:hoja_id>/pedido/<int:pedido_id>/<string:estado>', methods=['POST'])
+def mark_as_delivered(hoja_id, pedido_id,estado):
     form = EmptyForm()
     if form.validate_on_submit():
         hoja_pedido = HojaDeRutaPedido.get_by_pedido_id_and_hoja_id(pedido_id, hoja_id)
         if hoja_pedido:
-            hoja_pedido.estado = 'delivered'
-            hoja_pedido.save()
+            if estado == 'entregado':
+                hoja_pedido.estado = 'entregado'
+                hoja_pedido.save()
+                # Update the Pedido state to 'delivered'
+                pedido = Pedido.get_by_id(pedido_id)
+                pedido.estado='delivered'
+                deuda = Transaction(amount=-(pedido.total),client_id=pedido.cliente_id,date=datetime.now())
+                flash('Pedido marked as delivered!', 'success')
+            elif estado == 'cancelado':
+                hoja_pedido.estado = 'canceled'
+                hoja_pedido.save()
+                pedido = Pedido.get_by_id(pedido_id)
+                pedido.estado='cancelado'
+                flash('Pedido has been canceled.', 'success')
+            
+            db.session.commit()
 
-            # Update the Pedido state to 'delivered'
-            pedido = Pedido.get_by_id(pedido_id)
-            pedido.update_estado('delivered')
-
-            deuda = Transaction(amount=-(pedido.total),client_id=pedido.cliente_id,date=datetime.now())
-            deuda.save()
-
-            flash('Pedido marked as delivered!', 'success')
+            
         else:
             flash('Pedido not found in the Hoja de Ruta.', 'error')
     
@@ -622,8 +650,11 @@ def mark_as_canceled(hoja_id, pedido_id):
 
 
 
+# Run the app with SSH tunnel
 if __name__ == '__main__':
-    app.run(debug=True)
-    
-
-db.init_app(app)
+    try:
+        app.run(debug=True)
+    finally:
+        # Ensure SSH tunnel is closed when the app shuts down
+        if 'tunnel' in locals() and tunnel.is_active:
+            tunnel.close()

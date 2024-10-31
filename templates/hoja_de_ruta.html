@@ -34,13 +34,13 @@
                     <td>
                         <!-- Mark as Delivered button -->
                         {% if pedido.estado == 'on delivery' %}
-                        <form action="{{ url_for('mark_as_delivered', pedido_id=pedido.pedido_id, hoja_id=hoja_de_ruta.id) }}" method="POST" style="display:inline;">
+                        <form action="{{ url_for('mark_as_delivered', pedido_id=pedido.pedido_id, hoja_id=hoja_de_ruta.id,estado='entregado') }}" method="POST" style="display:inline;">
                             {{ form.hidden_tag() }}
                             <button type="submit" class="btn btn-success btn-sm">Entregado</button>
                         </form>
 
                         <!-- Cancel button -->
-                        <form action="{{ url_for('mark_as_canceled', pedido_id=pedido.pedido_id, hoja_id=hoja_de_ruta.id) }}" method="POST" style="display:inline;">
+                        <form action="{{ url_for('mark_as_delivered', pedido_id=pedido.pedido_id, hoja_id=hoja_de_ruta.id,estado='cancelado') }}" method="POST" style="display:inline;">
                             {{ form.hidden_tag() }}
                             <button type="submit" class="btn btn-danger btn-sm">Cancelar</button>
                         </form>
