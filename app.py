@@ -563,75 +563,35 @@ def create_hoja_de_ruta():
 @handle_db_error
 def view_hoja_de_ruta(hoja_id):
     hoja_de_ruta = HojaDeRuta.get_by_id(hoja_id)
-    form=EmptyForm()
-    if request.method == 'POST':
-        # Handle updating positions or marking orders as delivered
-        pedidos_posiciones = request.form.getlist('pedido_posicion')
-        entregado_pedido_id = request.form.get('entregado_pedido_id')
+    form = EmptyForm()
 
-        # Update positions of the pedidos in the hoja de ruta
+    if request.method == 'POST':
+        # Update positions of pedidos if provided
+        pedidos_posiciones = request.form.getlist('pedido_posicion')
         if pedidos_posiciones:
             for index, pedido_id in enumerate(pedidos_posiciones):
-                hoja_de_ruta_pedido = HojaDeRutaPedido.get_by_pedido_id_and_hoja_id(pedido_id, hoja_id)
-                hoja_de_ruta_pedido.posicion = index + 1
-                hoja_de_ruta_pedido.save()
+                hoja_de_ruta.update_pedido_position(pedido_id, index + 1)
 
-        # Mark a pedido as delivered and create debt for the client
-        if entregado_pedido_id:
-            hoja_de_ruta_pedido = HojaDeRutaPedido.get_by_pedido_id_and_hoja_id(entregado_pedido_id, hoja_id)
-            hoja_de_ruta_pedido.estado = 'delivered'
-            hoja_de_ruta_pedido.save()
+        # Check if a pedido needs to be marked as delivered or canceled
+        pedido_id = request.form.get('entregado_pedido_id')
+        estado = request.form.get('estado')
+        if pedido_id and estado:
+            pedido = Pedido.get_by_id(pedido_id)
+            if estado == 'delivered':
+                pedido.mark_as_delivered()
+            elif estado == 'canceled':
+                pedido.cancel()
 
-            # Update the pedido state
-            pedido = Pedido.get_by_id(entregado_pedido_id)
-            pedido.estado = 'delivered'
-            pedido.save()
-
-            # Create a debt for the client
-            debt = Transaction(
-                client_id=pedido.cliente_id,
-                amount=-pedido.total,  # Negative amount to indicate debt
-                description=f"Delivery of order {pedido.id}"
-            )
-            debt.save()
-
-            flash('Pedido marked as delivered and debt created!', 'success')
+            # After updating the pedido, check if HojaDeRuta should be completed
+            hoja_de_ruta.check_if_completed()
 
         return redirect(url_for('view_hoja_de_ruta', hoja_id=hoja_id))
 
-    # Fetch all pedidos in the hoja de ruta
+    # Fetch all pedidos in the hoja de ruta for display
     pedidos = HojaDeRutaPedido.get_detalle_by_hoja_id(hoja_id)
 
-    return render_template('hoja_de_ruta.html', hoja_de_ruta=hoja_de_ruta, pedidos=pedidos,form=form)
+    return render_template('hoja_de_ruta.html', hoja_de_ruta=hoja_de_ruta, pedidos=pedidos, form=form)
 
-@app.route('/hoja-de-ruta/<int:hoja_id>/pedido/<int:pedido_id>/<string:estado>', methods=['POST'])
-def mark_as_delivered(hoja_id, pedido_id,estado):
-    form = EmptyForm()
-    if form.validate_on_submit():
-        hoja_pedido = HojaDeRutaPedido.get_by_pedido_id_and_hoja_id(pedido_id, hoja_id)
-        if hoja_pedido:
-            if estado == 'entregado':
-                hoja_pedido.estado = 'entregado'
-                hoja_pedido.save()
-                # Update the Pedido state to 'delivered'
-                pedido = Pedido.get_by_id(pedido_id)
-                pedido.estado='delivered'
-                deuda = Transaction(amount=-(pedido.total),client_id=pedido.cliente_id,date=datetime.now())
-                flash('Pedido marked as delivered!', 'success')
-            elif estado == 'cancelado':
-                hoja_pedido.estado = 'canceled'
-                hoja_pedido.save()
-                pedido = Pedido.get_by_id(pedido_id)
-                pedido.estado='cancelado'
-                flash('Pedido has been canceled.', 'success')
-            
-            db.session.commit()
-
-            
-        else:
-            flash('Pedido not found in the Hoja de Ruta.', 'error')
-    
-    return redirect(url_for('view_hoja_de_ruta', hoja_id=hoja_id))
 
 @app.route('/hojas-de-ruta', methods=['GET'])
 @handle_db_error
@@ -639,27 +599,6 @@ def view_all_hojas_de_ruta():
     """Display a list of all Hojas de Ruta."""
     hojas = HojaDeRuta.get_all()  # Assuming get_all() retrieves all Hojas de Ruta
     return render_template('hojas_de_ruta.html', hojas=hojas)
-
-@app.route('/hoja-de-ruta/<int:hoja_id>/pedido/<int:pedido_id>/cancelar', methods=['POST'])
-@handle_db_error
-def mark_as_canceled(hoja_id, pedido_id):
-    form = EmptyForm()
-    if form.validate_on_submit():
-        hoja_pedido = HojaDeRutaPedido.get_by_pedido_id_and_hoja_id(pedido_id, hoja_id)
-        if hoja_pedido:
-            # Update the HojaDeRutaPedido and Pedido statuses to 'canceled'
-            hoja_pedido.estado = 'canceled'
-            hoja_pedido.save()
-
-            pedido = Pedido.get_by_id(pedido_id)
-            pedido.update_estado('canceled')
-
-            # Optional: Add logic for reversing or logging the canceled order
-            flash('Pedido has been canceled.', 'success')
-        else:
-            flash('Pedido not found in the Hoja de Ruta.', 'error')
-    
-    return redirect(url_for('view_hoja_de_ruta', hoja_id=hoja_id))
 
 
 

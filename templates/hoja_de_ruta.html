@@ -32,17 +32,17 @@
                     <td>{{ pedido.ubicacion }}</td>
                     <td>{{ pedido.estado }}</td>
                     <td>
-                        <!-- Mark as Delivered button -->
                         {% if pedido.estado == 'on delivery' %}
-                        <form action="{{ url_for('mark_as_delivered', pedido_id=pedido.pedido_id, hoja_id=hoja_de_ruta.id,estado='entregado') }}" method="POST" style="display:inline;">
+                        <!-- Single form for both actions: Delivered and Canceled -->
+                        <form action="{{ url_for('view_hoja_de_ruta', hoja_id=hoja_de_ruta.id) }}" method="POST" style="display:inline;">
                             {{ form.hidden_tag() }}
-                            <button type="submit" class="btn btn-success btn-sm">Entregado</button>
-                        </form>
-
-                        <!-- Cancel button -->
-                        <form action="{{ url_for('mark_as_delivered', pedido_id=pedido.pedido_id, hoja_id=hoja_de_ruta.id,estado='cancelado') }}" method="POST" style="display:inline;">
-                            {{ form.hidden_tag() }}
-                            <button type="submit" class="btn btn-danger btn-sm">Cancelar</button>
+                            <input type="hidden" name="entregado_pedido_id" value="{{ pedido.pedido_id }}">
+                            
+                            <!-- Button to mark as Delivered -->
+                            <button type="submit" name="estado" value="delivered" class="btn btn-success btn-sm">Entregado</button>
+                            
+                            <!-- Button to Cancel -->
+                            <button type="submit" name="estado" value="canceled" class="btn btn-danger btn-sm">Cancelar</button>
                         </form>
                         {% endif %}
                     </td>

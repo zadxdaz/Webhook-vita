@@ -100,7 +100,7 @@ class Pedido(db.Model):
 
     def calculate_total(self):
         producto = Producto.query.get(self.producto_id)
-        self.total = producto.precio * self.cantidad if producto else 0
+        self.total = float(producto.precio) * int(self.cantidad) if producto else 0
 
     def save(self):
         self.calculate_total()
@@ -110,6 +110,28 @@ class Pedido(db.Model):
     def delete(self):
         db.session.delete(self)
         db.session.commit()
+
+    def mark_as_delivered(self):
+        """Mark the pedido as delivered and create debt."""
+        self.estado = 'delivered'
+        db.session.commit()
+        self.create_debt()
+
+    def cancel(self):
+        """Mark the pedido as canceled."""
+        self.estado = 'canceled'
+        db.session.commit()
+
+    def create_debt(self):
+        """Create a debt transaction for this pedido's total amount."""
+        debt = Transaction(
+            client_id=self.cliente_id,
+            amount=-self.total,
+            description=f"Delivery of order {self.id}"
+        )
+        db.session.add(debt)
+        db.session.commit()
+    
 
     @staticmethod
     def get_by_id(id):
@@ -259,6 +281,20 @@ class HojaDeRuta(db.Model):
     @staticmethod
     def get_by_id(hoja_id):
         return HojaDeRuta.query.get(hoja_id)
+    
+    def check_if_completed(self):
+        """Set estado to 'completed' if all pedidos are delivered or canceled."""
+        pedidos = HojaDeRutaPedido.query.filter_by(hoja_de_ruta_id=self.id).all()
+        if all(pedido.estado in ['delivered', 'canceled'] for pedido in pedidos):
+            self.estado = 'completed'
+            db.session.commit()
+
+    def update_pedido_position(self, pedido_id, position):
+        """Update the position of a pedido in the hoja de ruta."""
+        hoja_de_ruta_pedido = HojaDeRutaPedido.query.filter_by(pedido_id=pedido_id, hoja_de_ruta_id=self.id).first()
+        if hoja_de_ruta_pedido:
+            hoja_de_ruta_pedido.posicion = position
+            db.session.commit()
 
 
 class HojaDeRutaPedido(db.Model):
@@ -293,6 +329,7 @@ class HojaDeRutaPedido(db.Model):
                 Pedido.estado,
                 Cliente.direccion.label('ubicacion')
             )
+            .select_from(HojaDeRutaPedido)
             .join(Pedido, HojaDeRutaPedido.pedido_id == Pedido.id)
             .join(Cliente, Pedido.cliente_id == Cliente.id)
             .join(Producto, Pedido.producto_id == Producto.id)
