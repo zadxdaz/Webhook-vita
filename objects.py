@@ -7,11 +7,11 @@ import sshtunnel
 import os
 import requests
 import time
+from db import db
 
 load_dotenv()
 DATABASE_URI = os.getenv('DATABASE', 'sqlite:///vita.db')
 ENVIROMENT = os.getenv("ENVIROMENT")
-db = SQLAlchemy()
 
 def init_app(app):
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False

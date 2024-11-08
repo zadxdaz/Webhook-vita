@@ -1,3 +1,5 @@
 /.venv
 .env
 vita.db
+/migrations
+/__pycache__
