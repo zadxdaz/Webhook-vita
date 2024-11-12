@@ -1,0 +1,26 @@
+<!-- Pedidos (Orders) List -->
+<div class="col-12 bg-light p-3 mt-4">
+    <h4>Orders</h4>
+    <table class="table table-sm table-striped">
+        <thead>
+            <tr>
+                <th>Order ID</th>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Status</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pedido in pedidos %}
+            <tr>
+                <td>{{ pedido.id }}</td>
+                <td>{{ pedido.producto.nombre }}</td>
+                <td>{{ pedido.cantidad }}</td>
+                <td>{{ pedido.estado }}</td>
+                <td>{{ pedido.total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

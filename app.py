@@ -302,62 +302,52 @@ def eliminar_pedido(id):
 
 @app.route('/client_messages/<whatsapp_id>', methods=['GET'])
 def client_messages(whatsapp_id):
-    conn = Mensaje.get_db_connection()
-    form = EmptyForm()
-    try:
-        # Fetch the client's data based on the whatsapp_id
-        client = Cliente.obtener_por_celular(whatsapp_id)
-    except sqlite3.Error as e:
-        print(f"Error retrieving messages for {whatsapp_id}: {e}")
-        messages = []
-        has_more = False
-        client = None
-    finally:
-        Mensaje.close_connection(conn)
+    client = Cliente.obtener_por_celular(whatsapp_id)
+    pedidos = Pedido.query.filter_by(cliente_id=client.id).all()
+    transactions = Transaction.query.filter_by(client_id=client.id).all()
+    return render_template('client_messages.html', client=client, pedidos=pedidos, transactions=transactions,whatsapp_id=whatsapp_id)
 
-    return render_template('client_messages.html',  
-                           whatsapp_id=whatsapp_id, 
-                           client=client,form=form )
+
+
 
 @app.route('/api/messages/<whatsapp_id>', methods=['GET'])
 @csrf.exempt
 def api_client_messages(whatsapp_id):
-    # Get the 'page' query parameter to handle pagination, default to 1 if not provided
+    # Pagination setup
     page = int(request.args.get('page', 1))
-    per_page = 100  # Number of messages to load per page
+    per_page = 100
     offset = (page - 1) * per_page
 
-    conn = Mensaje.get_db_connection()
     try:
-        cursor = conn.cursor()
-        # Fetch the messages for the specific client
-        cursor.execute('''
-            SELECT * FROM mensajes 
-            WHERE whatsapp_id = ?
-            ORDER BY timestamp ASC
-            LIMIT ? OFFSET ?
-        ''', (whatsapp_id, per_page, offset))
-        messages = cursor.fetchall()
+        # Query to fetch paginated messages
+        messages = (
+            db.session.query(Mensaje)
+            .filter_by(whatsapp_id=whatsapp_id)
+            .limit(per_page)
+            .offset(offset)
+            .all()
+        )
 
-        # Check if there are more messages for pagination
-        cursor.execute('SELECT COUNT(*) FROM mensajes WHERE whatsapp_id = ?', (whatsapp_id,))
-        total_messages = cursor.fetchone()[0]
+        # Check if more messages exist for pagination
+        total_messages = db.session.query(Mensaje).filter_by(whatsapp_id=whatsapp_id).count()
         has_more = total_messages > offset + per_page
+
+        # Format message data for JSON response
         messages_data = [
             {
-                'id': message['id'],
-                'message': message['message'],
-                'direction': message['direction'],
-                'timestamp': message['timestamp']
+                'id': message.id,
+                'message': message.message,
+                'direction': message.direction,
+                'timestamp': message.timestamp.isoformat()  # Convert timestamp to ISO format
             } for message in messages
         ]
-    except sqlite3.Error as e:
-        print(f"Error retrieving messages: {e}")
-        return jsonify({"error": "Database error"}), 500
-    finally:
-        Mensaje.close_connection(conn)
 
-    # Return messages in JSON format with pagination info
+    except Exception as e:
+        # Log and handle any database errors
+        app.logger.error(f"Error retrieving messages for {whatsapp_id}: {e}")
+        return jsonify({"error": "Database error"}), 500
+
+    # Return JSON response with pagination details
     return jsonify({
         'messages': messages_data,
         'has_more': has_more,
@@ -494,6 +484,7 @@ def get_client_balance(client_id):
 @app.route('/accounting', methods=['GET', 'POST'])
 @handle_db_error
 def accounting():
+    form = EmptyForm()
     # Handle adding a new transaction via POST request
     if request.method == 'POST':
         client_id = request.form.get('client_id')
@@ -523,7 +514,7 @@ def accounting():
     # Fetch all clients to populate the form
     clients = Cliente.get_all()
 
-    return render_template('accounting.html', transactions=transactions, old_debts=old_debts, clients=clients)
+    return render_template('accounting.html', transactions=transactions, old_debts=old_debts, clients=clients,form=form)
 
 @app.route('/hoja-de-ruta/nueva', methods=['POST'])
 @handle_db_error
@@ -599,6 +590,17 @@ def view_all_hojas_de_ruta():
     """Display a list of all Hojas de Ruta."""
     hojas = HojaDeRuta.get_all()  # Assuming get_all() retrieves all Hojas de Ruta
     return render_template('hojas_de_ruta.html', hojas=hojas)
+
+@app.route('/update_client_info/<int:id>', methods=['POST'])
+@login_required
+def update_client_info(id):
+    client = Cliente.get_by_id(id)
+    client.nombre_completo = request.form.get('nombre_completo')
+    client.celular = request.form.get('celular')
+    client.direccion = request.form.get('direccion')
+    client.save()
+    flash('Client information updated successfully!', 'success')
+    return redirect(url_for('client_messages', whatsapp_id=client.celular))
 
 
 
