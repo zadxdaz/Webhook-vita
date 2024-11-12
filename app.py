@@ -79,7 +79,7 @@ app.register_blueprint(auth_bp, url_prefix='/auth')
 
 @app.before_request
 def require_login():
-    allowed_routes = ['auth.login', 'auth.verify_webhook', 'auth.webhook']  # Routes without login
+    allowed_routes = ['auth.login', 'verify_webhook', 'webhook']  # Routes without login
     if request.endpoint not in allowed_routes and not current_user.is_authenticated:
         return redirect(url_for('auth.login'))
 
