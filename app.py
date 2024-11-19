@@ -81,6 +81,15 @@ def load_user(user_id):
 app.register_blueprint(auth_bp, url_prefix='/auth')
 
 @app.before_request
+def check_db_server():
+    try:
+        db.session.execute('SELECT 1')  # Send a lightweight query to keep the connection alive
+    except Exception:
+        db.session.rollback()  # Rollback any failed transactions
+        db.session.remove()    # Remove the stale session
+
+
+@app.before_request
 def require_login():
     allowed_routes = ['auth.login', 'verify_webhook', 'webhook']  # Routes without login
     if request.endpoint not in allowed_routes and not current_user.is_authenticated:
