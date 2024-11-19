@@ -92,7 +92,7 @@ class Pedido(db.Model):
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
     producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
     cantidad = db.Column(db.Integer, nullable=False)
-    estado = db.Column(db.String(255), nullable=False, default='pending')
+    estado = db.Column(db.String(255), nullable=False, default='pendiente')
     total = db.Column(db.Float, nullable=False)
 
     cliente = relationship("Cliente")
@@ -476,13 +476,11 @@ class Bot:
         """Creates an order, saves it to the database, and confirms with the client."""
         try:
             pedido = Pedido(cliente_id=cliente.id, producto_id=cliente.producto_seleccionado, cantidad=int(cantidad))
-            pedido.save()
-
+            pedido.calculate_total()
             producto = Producto.get_by_id(pedido.producto_id)
-
+            db.session.add(pedido)
             mensaje = f"Gracias {cliente.nombre_completo}, tu pedido de {cantidad} {producto.nombre}(s) ha sido registrado."
             self.enviar_mensaje(cliente.celular, mensaje)
-
             cliente.estado_conversacion = None
             cliente.producto_seleccionado = None
             db.session.commit()

@@ -57,7 +57,7 @@
        {% if pedido.estado != 'pendiente' %}disabled{% endif %}>
 
                         </td>
-                        <td>{{ pedido.id }}</td>
+                        <td>{{ pedido.pedido_id }}</td>
                         <td>{{ pedido.cliente }}</td>
                         <td>{{ pedido.producto }}</td>
                         <td>{{ pedido.cantidad }}</td>
@@ -69,7 +69,7 @@
 
 
                             <!-- Delete button triggers a JS function, no need for a form -->
-                            <button type="button" class="btn btn-danger btn-sm" onclick="deletePedido({{ pedido.id }})">Eliminar</button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick='deletePedido({{ pedido.pedido_id }})'>Eliminar</button>
                         </td>
                     </tr>
                     {% endfor %}
