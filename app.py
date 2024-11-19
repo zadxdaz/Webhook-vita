@@ -52,6 +52,9 @@ if ENVIRONMENT == 'Debug':
 else:
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE
 
+
+app.config['SQLALCHEMY_POOL_RECYCLE'] = 28000  # Adjust this value based on wait_timeout
+app.config['SQLALCHEMY_POOL_PRE_PING'] = True   # Enables automatic reconnection
 from flask_migrate import Migrate
 migrate = Migrate(app, db)
 
