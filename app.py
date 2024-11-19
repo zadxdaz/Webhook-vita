@@ -341,7 +341,7 @@ def api_client_messages(whatsapp_id):
                 'id': message.id,
                 'message': message.message,
                 'direction': message.direction,
-                'timestamp': message.timestamp.isoformat()  # Convert timestamp to ISO format
+                'timestamp': message.timestamp  # Convert timestamp to ISO format
             } for message in messages
         ]
 
