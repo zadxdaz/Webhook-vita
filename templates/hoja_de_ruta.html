@@ -33,15 +33,10 @@
                     <td>{{ pedido.estado }}</td>
                     <td>
                         {% if pedido.estado == 'on delivery' %}
-                        <!-- Single form for both actions: Delivered and Canceled -->
                         <form action="{{ url_for('view_hoja_de_ruta', hoja_id=hoja_de_ruta.id) }}" method="POST" style="display:inline;">
                             {{ form.hidden_tag() }}
                             <input type="hidden" name="entregado_pedido_id" value="{{ pedido.pedido_id }}">
-                            
-                            <!-- Button to mark as Delivered -->
                             <button type="submit" name="estado" value="delivered" class="btn btn-success btn-sm">Entregado</button>
-                            
-                            <!-- Button to Cancel -->
                             <button type="submit" name="estado" value="canceled" class="btn btn-danger btn-sm">Cancelar</button>
                         </form>
                         {% endif %}
@@ -51,5 +46,57 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Map Section -->
+    <div class="mt-5">
+        <h2>Mapa de la Hoja de Ruta</h2>
+        <p class="text-muted">La ruta se genera automáticamente con las direcciones listadas.</p>
+        <div id="map" style="height: 500px; width: 100%;"></div>
+    </div>
 </div>
+
+<!-- Google Maps API -->
+<script src="https://maps.googleapis.com/maps/api/js?key={{ config.GOOGLE_MAPS_API_KEY }}&libraries=geometry"></script>
+
+<script>
+    const addresses = {{ addresses|tojson }};
+    const apiKey = "{{ config.GOOGLE_MAPS_API_KEY }}";
+
+    function initializeMap() {
+        const map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 10,
+            center: { lat: -34.603684, lng: -58.381559 } // Default center
+        });
+
+        fetch('/api/compute_route', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ addresses })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.routes && data.routes.length > 0) {
+                const route = data.routes[0];
+                const path = google.maps.geometry.encoding.decodePath(route.polyline.encodedPolyline);
+                const polyline = new google.maps.Polyline({
+                    path,
+                    geodesic: true,
+                    strokeColor: '#FF0000',
+                    strokeOpacity: 1.0,
+                    strokeWeight: 2
+                });
+                polyline.setMap(map);
+
+                // Fit the map to the route
+                const bounds = new google.maps.LatLngBounds();
+                path.forEach(latLng => bounds.extend(latLng));
+                map.fitBounds(bounds);
+            }
+        })
+        .catch(err => console.error('Error fetching route:', err));
+    }
+
+    window.onload = initializeMap;
+</script>
+
 {% endblock %}

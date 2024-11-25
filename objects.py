@@ -26,6 +26,8 @@ class Cliente(db.Model):
     direccion = db.Column(db.String(255), nullable=False)
     estado_conversacion = db.Column(db.String(50), nullable=True)
     producto_seleccionado = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=True)
+    ciudad = db.Column(db.String(255), nullable=True)
+    comentarios = db.Column(db.Text, nullable=True)   
 
     def save(self):
         db.session.add(self)
@@ -324,6 +326,7 @@ class HojaDeRutaPedido(db.Model):
             db.session.query(
                 Pedido.id.label('pedido_id'),
                 Cliente.nombre_completo.label('cliente'),
+                Cliente.ciudad,
                 Producto.nombre.label('producto'),
                 Pedido.cantidad,
                 Pedido.estado,

@@ -1,6 +1,7 @@
 import os
 import sqlite3
 from flask import Flask, g, render_template, request, redirect, url_for, abort , jsonify, flash
+import urllib.parse
 from flask_wtf.csrf import CSRFProtect 
 from flask_wtf import FlaskForm
 from wtforms import StringField,SubmitField
@@ -12,6 +13,7 @@ from flask_sqlalchemy import SQLAlchemy
 from auth import auth_bp
 from auth.models import User
 from flask_login import LoginManager,current_user,login_required
+from forms import ClienteForm
 # Load sensitive data from environment variables
 from dotenv import load_dotenv
 
@@ -21,12 +23,13 @@ PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
 WEBHOOK_VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN")
 DATABASE = os.getenv("DATABASE", "vita.db")
 ENVIRONMENT = os.getenv("ENVIROMENT")
-
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY')
 csrf = CSRFProtect(app)
 bot = Bot(KEY,PHONE_NUMBER_ID)
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE
+app.config['GOOGLE_MAPS_API_KEY'] = GOOGLE_MAPS_API_KEY
 
 class EmptyForm(FlaskForm):
     pass
@@ -160,18 +163,20 @@ def index():
     )
 
 @app.route('/nuevo_cliente', methods=['GET', 'POST'])
-@handle_db_error
 def nuevo_cliente():
-    form=EmptyForm()
-    if request.method == 'POST':
-        nombre = request.form['nombre_completo']
-        celular = request.form['celular']
-        direccion = request.form['direccion']
-
-        cliente = Cliente(nombre_completo=nombre, celular=celular, direccion=direccion)
+    form = ClienteForm()
+    if form.validate_on_submit():
+        cliente = Cliente(
+            nombre_completo=form.nombre_completo.data,
+            celular=form.celular.data,
+            direccion=form.direccion.data,
+            ciudad=form.ciudad.data,
+            comentarios=form.comentarios.data  
+        )
         cliente.save()
         return redirect(url_for('index'), 302)
-    return render_template('nuevo_cliente.html',form=form), 200
+    return render_template('nuevo_cliente.html', form=form)
+
 
 @app.route('/editar_cliente/<int:id>', methods=['GET', 'POST'])
 @handle_db_error
@@ -314,10 +319,16 @@ def eliminar_pedido(id):
 
 @app.route('/client_messages/<whatsapp_id>', methods=['GET'])
 def client_messages(whatsapp_id):
+    form = EmptyForm()
     client = Cliente.obtener_por_celular(whatsapp_id)
     pedidos = Pedido.query.filter_by(cliente_id=client.id).all()
     transactions = Transaction.query.filter_by(client_id=client.id).all()
-    return render_template('client_messages.html', client=client, pedidos=pedidos, transactions=transactions,whatsapp_id=whatsapp_id)
+    return render_template('client_messages.html',
+                            client=client,
+                            pedidos=pedidos,
+                            transactions=transactions,
+                            whatsapp_id=whatsapp_id,
+                            form=form)
 
 
 
@@ -593,7 +604,19 @@ def view_hoja_de_ruta(hoja_id):
     # Fetch all pedidos in the hoja de ruta for display
     pedidos = HojaDeRutaPedido.get_detalle_by_hoja_id(hoja_id)
 
-    return render_template('hoja_de_ruta.html', hoja_de_ruta=hoja_de_ruta, pedidos=pedidos, form=form)
+    # Extract addresses from pedidos or use an empty list if no addresses are found
+    addresses = []
+    for pedido in pedidos:
+        full_address = f"{pedido.ubicacion}, {pedido.ciudad}, Buenos Aires"
+        addresses.append(full_address)
+
+    return render_template(
+        'hoja_de_ruta.html',
+        hoja_de_ruta=hoja_de_ruta,
+        pedidos=pedidos,
+        form=form,
+        addresses=addresses
+    )
 
 
 @app.route('/hojas-de-ruta', methods=['GET'])
@@ -604,18 +627,83 @@ def view_all_hojas_de_ruta():
     return render_template('hojas_de_ruta.html', hojas=hojas)
 
 @app.route('/update_client_info/<int:id>', methods=['POST'])
-@login_required
 def update_client_info(id):
     client = Cliente.get_by_id(id)
+    if not client:
+        return "Client not found", 404
+
+    # Update client fields from the form
     client.nombre_completo = request.form.get('nombre_completo')
     client.celular = request.form.get('celular')
     client.direccion = request.form.get('direccion')
-    client.save()
-    flash('Client information updated successfully!', 'success')
+    client.ciudad = request.form.get('ciudad')
+    client.comentarios = request.form.get('comentarios')
+
+    client.save()  # Save changes to the database
     return redirect(url_for('client_messages', whatsapp_id=client.celular))
 
 
 
+@csrf.exempt
+@app.route('/api/compute_route', methods=['POST'])
+def compute_route():
+    try:
+        data = request.json
+        addresses = data.get('addresses', [])
+
+        if not addresses or len(addresses) < 2:
+            return jsonify({"error": "At least two addresses are required"}), 400
+
+        api_key = app.config['GOOGLE_MAPS_API_KEY']
+
+        # Geocode all addresses to get latitude and longitude
+        geocoded_locations = []
+        geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
+
+        for address in addresses:
+            params = {"address": address, "key": api_key}
+            response = requests.get(geocode_url, params=params)
+            if response.status_code == 200:
+                result = response.json()
+                if result["results"]:
+                    location = result["results"][0]["geometry"]["location"]
+                    geocoded_locations.append({
+                        "latitude": location["lat"],
+                        "longitude": location["lng"]
+                    })
+                else:
+                    return jsonify({"error": f"Geocoding failed for address: {address}"}), 400
+            else:
+                return jsonify({"error": "Geocoding API error", "details": response.json()}), response.status_code
+
+        # Construct the payload for the Routes API
+        payload = {
+            "origin": {"location": {"latLng": geocoded_locations[0]}},
+            "destination": {"location": {"latLng": geocoded_locations[-1]}},
+            "intermediates": [{"location": {"latLng": loc}} for loc in geocoded_locations[1:-1]],
+            "travelMode": "DRIVE",
+            "optimizeWaypointOrder": True
+        }
+
+        # Call the Routes API with FieldMask
+        routes_url = "https://routes.googleapis.com/directions/v2:computeRoutes"
+        headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": api_key,
+            "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.optimizedIntermediateWaypointIndex"
+        }
+        response = requests.post(routes_url, headers=headers, json=payload)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            print(response.text)
+            return jsonify({"error": "Failed to compute route", "details": response.json()}), response.status_code
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({"error": "Internal Server Error"}), 500
+
+ 
 # Run the app with SSH tunnel
 if __name__ == '__main__':
     try:

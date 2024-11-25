@@ -6,12 +6,12 @@
 <div class="container-fluid mt-4">
     <div class="row">
         <!-- Client Information and Pedidos List -->
-        <div class="col-md-4 d-flex flex-column bg-light p-3 border-right">
+        <div class="col-md-4 d-flex flex-column bg-light p-3 border-right w-100">
             {% include 'client_info.html' %} <!-- Editable Client Information -->
         </div>
 
         <!-- Chat Window -->
-        <div class="col-md-9 d-flex flex-column p-0">
+        <div class="col-md-8 d-flex flex-column p-0">
             <div class="bg-white border-bottom p-3">
                 <h1>Messages for Client: {{ whatsapp_id }}</h1>
             </div>
@@ -43,7 +43,6 @@
         </div>
     </div>
 </div>
-
 
 <!-- Bootstrap and jQuery -->
 

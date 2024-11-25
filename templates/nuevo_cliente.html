@@ -12,28 +12,29 @@
         <h1 class="mb-4">Agregar Cliente</h1>
         
         <!-- Client form -->
-        <form action="{{ url_for('nuevo_cliente') }}" method="POST">
-            <!-- Full Name -->
-            <div class="form-group">
-                <label for="nombre_completo">Nombre Completo:</label>
-                <input type="text" class="form-control" id="nombre_completo" name="nombre_completo" required>
-            </div>
-
-            <!-- Phone Number -->
-            <div class="form-group">
-                <label for="celular">Celular:</label>
-                <input type="text" class="form-control" id="celular" name="celular" required>
-            </div>
-
-            <!-- Address -->
-            <div class="form-group">
-                <label for="direccion">Dirección:</label>
-                <input type="text" class="form-control" id="direccion" name="direccion" required>
-            </div>
-
-            <!-- Submit Button -->
-            <button type="submit" class="btn btn-primary">Agregar Cliente</button>
+        <form method="POST">
             {{ form.hidden_tag() }}
+            <div class="form-group">
+                {{ form.nombre_completo.label }}
+                {{ form.nombre_completo(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.celular.label }}
+                {{ form.celular(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.direccion.label }}
+                {{ form.direccion(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.ciudad.label }}
+                {{ form.ciudad(class="form-control") }}  <!-- New field -->
+            </div>
+            <div class="form-group">
+                {{ form.comentarios.label }}
+                {{ form.comentarios(class="form-control") }}  <!-- New field -->
+            </div>
+            <button type="submit" class="btn btn-primary">Guardar</button>
         </form>
     </div>
 
