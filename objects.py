@@ -47,7 +47,15 @@ class Cliente(db.Model):
 
     @staticmethod
     def obtener_por_celular(celular):
-        return Cliente.query.filter_by(celular=celular).first()
+        # Attempt to find the cliente with the given celular
+        cliente = Cliente.query.filter_by(celular=celular).first()
+        if cliente:
+            return cliente
+        else:
+            # If not found, prepend "54" to celular and search again
+            celular_with_prefix = "54" + celular
+            return Cliente.query.filter_by(celular=celular_with_prefix).first()
+
 
     def get_balance(self):
         transactions = Transaction.get_by_client_id(self.id)
@@ -455,7 +463,7 @@ class Bot:
             db.session.add(message)
             db.session.commit()
             print(f"Received message from {phone_number}: {message_text}")
-
+            
             cliente = Cliente.obtener_por_celular(phone_number)
             if cliente:
                 if cliente.estado_conversacion == "esperando_producto":
