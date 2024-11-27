@@ -379,7 +379,7 @@ class Bot:
         if number.startswith("549"):
             # Convert '549...' to '+54...'
             return f"54{number[3:]}"
-        elif not number.startswith("+54"):
+        elif not number.startswith("54"):
             # Add '+54' if not already present
             return f"54{number.lstrip('0')}"  # Strip leading zeroes for consistency
         return number  # Return unchanged if already starts with '+54'
