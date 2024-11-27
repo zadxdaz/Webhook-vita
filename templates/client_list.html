@@ -7,14 +7,14 @@
     <h1 class="mb-4">{{ client_list.nombre }}</h1>
 
     <!-- Clients Section -->
-    <h2>Clients</h2>
+    <h2>Clientes</h2>
 
     <!-- Button to send message to all clients -->
     <div class="mb-3">
-        <h2>Send Message to All Clients</h2>
+        <h2>Enviar Mensaje a los clientes</h2>
         <form action="{{ url_for('send_message_to_clients', lista_id=client_list.id) }}" method="POST">
             {{ form.hidden_tag() }}
-            <button type="submit" class="btn btn-primary">Send Message to All Clients</button>
+            <button type="submit" class="btn btn-primary">Enviar Mensaje a los clientes</button>
         </form>
     </div>
 
@@ -25,36 +25,36 @@
             {{ client.nombre_completo }} ({{ client.celular }})
             <form action="{{ url_for('remove_client_from_list', lista_id=client_list.id, cliente_id=client.id) }}" method="POST">
                 {{ form.hidden_tag() }}
-                <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                <button type="submit" class="btn btn-danger btn-sm">Eliminar de la lista</button>
             </form>
         </li>
         {% endfor %}
     </ul>
 
     <!-- Add Client Section -->
-    <h2>Add Client</h2>
+    <h2>Añadir cliente</h2>
     <form action="{{ url_for('add_client_to_list', lista_id=client_list.id) }}" method="POST" class="mb-4">
         {{ form.hidden_tag() }}
         <div class="form-group">
-            <label for="cliente_id">Select Client:</label>
+            <label for="cliente_id">Seleccionar Cliente:</label>
             <select name="cliente_id" id="cliente_id" class="form-control">
                 {% for cliente in all_clients %}
                 <option value="{{ cliente.id }}">{{ cliente.nombre_completo }} ({{ cliente.celular }})</option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="btn btn-success">Add</button>
+        <button type="submit" class="btn btn-success">Añadir</button>
     </form>
 
     <!-- Rename List Section -->
-    <h2>Rename List</h2>
+    <h2>Renombrar lista</h2>
     <form action="{{ url_for('rename_client_list', lista_id=client_list.id) }}" method="POST">
         {{ form.hidden_tag() }}
         <div class="form-group">
-            <label for="new_name">New Name:</label>
+            <label for="new_name">Nuevo Nombre:</label>
             <input type="text" name="new_name" id="new_name" class="form-control" required>
         </div>
-        <button type="submit" class="btn btn-warning">Rename</button>
+        <button type="submit" class="btn btn-warning">Renombrar</button>
     </form>
 
     <!-- Back to All Lists Link -->

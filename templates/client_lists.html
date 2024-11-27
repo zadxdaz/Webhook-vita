@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h1 class="mb-4">All Client Lists</h1>
+    <h1 class="mb-4">Listas de Clientes</h1>
 
     <!-- Client Lists -->
     <ul class="list-group mb-4">
@@ -17,9 +17,9 @@
 
 
 <!-- Bootstrap button for creating a new client list -->
-<a href="{{ url_for('nuevo_lista') }}" class="btn btn-success mt-3">Create New Client List</a>
+    <a href="{{ url_for('nuevo_lista') }}" class="btn btn-success mt-3">Crear nueva Lista</a>
 
     <!-- Back to Home Button -->
-    <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Volver a Clientes</a>
 </div>
 {% endblock %}

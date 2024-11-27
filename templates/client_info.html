@@ -3,11 +3,11 @@
 
     <form id="client-info-form" method="POST" action="{{ url_for('update_client_info', id=client.id) }}" class="w-100">
         <div id="client-info-display" class="w-100">
-            <p><strong>Name:</strong> <span id="client-name">{{ client.nombre_completo }}</span></p>
-            <p><strong>Phone:</strong> <span id="client-phone">{{ client.celular }}</span></p>
-            <p><strong>Address:</strong> <span id="client-address">{{ client.direccion }}</span></p>
-            <p><strong>City:</strong> <span id="client-city">{{ client.ciudad or "None" }}</span></p>
-            <p><strong>Comments:</strong> <span id="client-comments">{{ client.comentarios or "None" }}</span></p>
+            <p><strong>Nombre:</strong> <span id="client-name">{{ client.nombre_completo }}</span></p>
+            <p><strong>Telefono:</strong> <span id="client-phone">{{ client.celular }}</span></p>
+            <p><strong>Direccion:</strong> <span id="client-address">{{ client.direccion }}</span></p>
+            <p><strong>Ciudad:</strong> <span id="client-city">{{ client.ciudad or "None" }}</span></p>
+            <p><strong>Comentarios:</strong> <span id="client-comments">{{ client.comentarios or "None" }}</span></p>
             <p><strong>Estado Conversación:</strong> {{ client.estado_conversacion or "None" }}</p>
             <p><strong>Producto Seleccionado:</strong> {{ client.producto_seleccionado or "None" }}</p>
 
@@ -31,9 +31,9 @@
             <textarea id="edit-comments" name="comentarios" class="form-control mb-2" rows="3">{{ client.comentarios }}</textarea>
         </div>
         <div>
-            <button type="button" id="edit-client-info" class="btn btn-secondary mt-2 w-100">Edit</button>
-            <button type="submit" id="save-client-info" class="btn btn-primary mt-2 w-100 d-none">Save</button>
-            <button type="button" id="cancel-client-info" class="btn btn-danger mt-2 w-100 d-none">Cancel</button>
+            <button type="button" id="edit-client-info" class="btn btn-secondary mt-2 w-100">Editar</button>
+            <button type="submit" id="save-client-info" class="btn btn-primary mt-2 w-100 d-none">Guardar</button>
+            <button type="button" id="cancel-client-info" class="btn btn-danger mt-2 w-100 d-none">Cancelar</button>
         </div>
         {{ form.hidden_tag() }}
     </form>
