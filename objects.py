@@ -478,6 +478,8 @@ class Bot:
                     producto = Producto.get_by_nombre(message_text)
                     if producto:
                         self.preguntar_cantidad(cliente, message_text)
+                    else:
+                        self.enviar_mensaje(phone_number,"Producto incorrecto")
                 elif cliente.estado_conversacion == "esperando_cantidad":
                     self.confirmar_pedido(cliente, message_text)
 
