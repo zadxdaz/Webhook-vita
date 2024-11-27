@@ -16,7 +16,7 @@ from flask_login import LoginManager,current_user,login_required
 from forms import ClienteForm
 # Load sensitive data from environment variables
 from dotenv import load_dotenv
-
+from sqlalchemy import or_
 
 load_dotenv()
 KEY = os.getenv("WHATSAPP_API_KEY")
@@ -352,11 +352,16 @@ def api_client_messages(whatsapp_id):
         # Query to fetch paginated messages
         messages = (
             db.session.query(Mensaje)
-            .filter_by(whatsapp_id=whatsapp_id)
+            .filter(
+                or_(
+                    Mensaje.whatsapp_id == whatsapp_id,  # Exact match
+                    Mensaje.whatsapp_id.startswith("54")  # Starts with "54"
+                )
+            )
             .limit(per_page)
             .offset(offset)
             .all()
-        )
+)
 
         # Check if more messages exist for pagination
         total_messages = db.session.query(Mensaje).filter_by(whatsapp_id=whatsapp_id).count()
