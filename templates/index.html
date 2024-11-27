@@ -39,15 +39,6 @@
                     <td>{{ cliente_info.balance }}</td> <!-- Display client balance -->
 
                     <td>
-                        <!-- Edit button -->
-                        <a href="{{ url_for('editar_cliente', id=cliente_info.client.id) }}" class="btn btn-warning btn-sm">Editar</a>
-
-                        <!-- Delete form -->
-                        <form action="{{ url_for('eliminar_cliente', id=cliente_info.client.id) }}" method="POST" style="display:inline;">
-                            {{ form.hidden_tag() }}
-                            <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-                        </form>
-
                         <!-- Start bot conversation form -->
                         <form action="{{ url_for('iniciar_conversacion', id=cliente_info.client.id) }}" method="POST" style="display:inline;">
                             {{ form.hidden_tag() }}
@@ -57,7 +48,7 @@
 
                     <!-- View Messages button -->
                     <td>
-                        <a href="{{ url_for('client_messages', whatsapp_id=cliente_info.client.celular) }}" class="btn btn-secondary btn-sm">View Messages</a>
+                        <a href="{{ url_for('client_messages', whatsapp_id=cliente_info.client.celular) }}" class="btn btn-secondary btn-sm">Detalles</a>
                     </td>
                 </tr>
                 {% endfor %}
