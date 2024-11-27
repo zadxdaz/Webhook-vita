@@ -17,6 +17,7 @@ from forms import ClienteForm
 # Load sensitive data from environment variables
 from dotenv import load_dotenv
 
+
 load_dotenv()
 KEY = os.getenv("WHATSAPP_API_KEY")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
@@ -56,8 +57,13 @@ else:
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE
 
 
-app.config['SQLALCHEMY_POOL_RECYCLE'] = 28000  # Adjust this value based on wait_timeout
-app.config['SQLALCHEMY_POOL_PRE_PING'] = True   # Enables automatic reconnection
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 10,
+    'max_overflow': 5,
+    'pool_timeout': 30,
+    'pool_recycle': 280,
+    'pool_pre_ping': True
+}
 from flask_migrate import Migrate
 migrate = Migrate(app, db)
 
