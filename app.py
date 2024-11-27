@@ -228,6 +228,7 @@ def nuevo_producto():
 @app.route('/editar_producto/<int:id>', methods=['GET', 'POST'])
 @handle_db_error
 def editar_producto(id):
+    form=EmptyForm()
     producto = Producto.get_by_id(id)
     if request.method == 'POST':
         nombre = request.form['nombre']
@@ -240,7 +241,7 @@ def editar_producto(id):
         producto.save()
         return redirect(url_for('productos'), 302)
 
-    return render_template('editar_producto.html', producto=producto), 200
+    return render_template('editar_producto.html', producto=producto,form=form), 200
 
 @app.route('/eliminar_producto/<int:id>', methods=['POST'])
 @handle_db_error
