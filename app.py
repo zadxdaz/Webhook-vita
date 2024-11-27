@@ -649,7 +649,11 @@ def update_client_info(id):
 def compute_route():
     try:
         data = request.json
+        hoja_id = data.get('hoja_id')
         addresses = data.get('addresses', [])
+
+        if not hoja_id:
+            return jsonify({"error": "hoja_id is required"}), 400
 
         if not addresses or len(addresses) < 2:
             return jsonify({"error": "At least two addresses are required"}), 400
@@ -676,6 +680,9 @@ def compute_route():
             else:
                 return jsonify({"error": "Geocoding API error", "details": response.json()}), response.status_code
 
+        if len(geocoded_locations) < 2:
+            return jsonify({"error": "Insufficient geocoded locations for routing."}), 400
+
         # Construct the payload for the Routes API
         payload = {
             "origin": {"location": {"latLng": geocoded_locations[0]}},
@@ -685,16 +692,49 @@ def compute_route():
             "optimizeWaypointOrder": True
         }
 
-        # Call the Routes API with FieldMask
         routes_url = "https://routes.googleapis.com/directions/v2:computeRoutes"
         headers = {
             "Content-Type": "application/json",
             "X-Goog-Api-Key": api_key,
-            "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.optimizedIntermediateWaypointIndex"
+            "X-Goog-FieldMask": "routes.polyline.encodedPolyline,routes.optimizedIntermediateWaypointIndex"
         }
+
         response = requests.post(routes_url, headers=headers, json=payload)
         if response.status_code == 200:
-            return jsonify(response.json())
+            data = response.json()
+            pedidos = HojaDeRutaPedido.query.filter_by(hoja_de_ruta_id=hoja_id).order_by(HojaDeRutaPedido.posicion).all()
+            # Extract the optimized order and polyline
+            encoded_polyline = data.get("routes", [{}])[0].get("polyline", {}).get("encodedPolyline", None)
+
+            if not encoded_polyline:
+                return jsonify({"error": "Failed to retrieve route polyline"}), 400
+
+           # Extract optimized order
+            optimized_order = data.get("routes", [{}])[0].get("optimizedIntermediateWaypointIndex", [])
+
+            # Include the fixed origin and destination indices
+            full_order = [0] + [index + 1 for index in optimized_order] + [len(geocoded_locations) - 1]
+
+            if len(full_order) != len(pedidos):
+                print(f"Mismatch: {len(full_order)} indices vs {len(pedidos)} pedidos")
+                return jsonify({"error": "Mismatch between pedidos and waypoints."}), 400
+
+            # Reorder pedidos based on the full order
+            for new_position, waypoint_index in enumerate(full_order):
+                if waypoint_index < len(pedidos):
+                    pedido = pedidos[waypoint_index]
+                    pedido.posicion = new_position + 1
+                    pedido.save()
+                else:
+                    print(f"Invalid waypoint index: {waypoint_index}")
+                    return jsonify({"error": f"Invalid waypoint index: {waypoint_index}"}), 400
+
+
+            # Return the polyline for frontend mapping
+            return jsonify({
+                "success": "Route optimized and saved successfully",
+                "polyline": encoded_polyline
+            }), 200
         else:
             print(response.text)
             return jsonify({"error": "Failed to compute route", "details": response.json()}), response.status_code
@@ -703,7 +743,63 @@ def compute_route():
         print(f"Error: {e}")
         return jsonify({"error": "Internal Server Error"}), 500
 
- 
+@csrf.exempt
+@app.route('/hoja-de-ruta/<int:hoja_id>/reorder', methods=['POST'])
+def reorder_pedidos(hoja_id):
+    try:
+        data = request.json
+        print("Received payload:", data)  # Debug the incoming payload
+        new_order = data.get('order')
+
+        if not new_order:
+            print("No order provided in the payload")
+            return jsonify({'error': 'No order provided'}), 400
+
+        # Update the order of pedidos in the database
+        for position, pedido_id in enumerate(new_order, start=1):
+            hoja_de_ruta_pedido = HojaDeRutaPedido.get_by_pedido_id_and_hoja_id(pedido_id, hoja_id)
+            if hoja_de_ruta_pedido:
+                hoja_de_ruta_pedido.posicion = position
+                hoja_de_ruta_pedido.save()
+
+        return jsonify({'success': 'Order updated successfully'}), 200
+    except Exception as e:
+        print(f"Error reordering pedidos: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/hoja-de-ruta/<int:hoja_id>/optimize', methods=['POST'])
+def optimize_hoja_de_ruta(hoja_id):
+    hoja_de_ruta = HojaDeRuta.get_by_id(hoja_id)
+    addresses = []
+    # Fetch all addresses in the current order
+    pedidos = HojaDeRutaPedido.get_detalle_by_hoja_id(hoja_id)
+    for pedido in pedidos:
+        full_address = f"{pedido.ubicacion}, {pedido.ciudad}, Buenos Aires"
+        addresses.append(full_address)
+
+    # Call the /api/compute_route to get the optimized order
+    response = requests.post(
+        url_for('compute_route'),
+        json={"addresses": addresses}
+    )
+
+    if response.status_code == 200:
+        data = response.json()
+        optimized_order = data.get("routes")[0].get("optimizedIntermediateWaypointIndex", [])
+
+        # Apply the optimized order
+        for new_position, waypoint_index in enumerate(optimized_order):
+            pedido = pedidos[waypoint_index]
+            pedido.posicion = new_position + 1
+            pedido.save()
+
+        return jsonify({"success": "Route optimized successfully"}), 200
+    else:
+        print(response.text)
+        return jsonify({"error": "Failed to optimize route", "details": response.json()}), response.status_code
+
+
 # Run the app with SSH tunnel
 if __name__ == '__main__':
     try:

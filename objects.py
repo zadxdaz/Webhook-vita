@@ -330,13 +330,15 @@ class HojaDeRutaPedido(db.Model):
                 Producto.nombre.label('producto'),
                 Pedido.cantidad,
                 Pedido.estado,
-                Cliente.direccion.label('ubicacion')
+                Cliente.direccion.label('ubicacion'),
+                HojaDeRutaPedido.posicion
             )
             .select_from(HojaDeRutaPedido)
             .join(Pedido, HojaDeRutaPedido.pedido_id == Pedido.id)
             .join(Cliente, Pedido.cliente_id == Cliente.id)
             .join(Producto, Pedido.producto_id == Producto.id)
             .filter(HojaDeRutaPedido.hoja_de_ruta_id == hoja_de_ruta_id)
+            .order_by(HojaDeRutaPedido.posicion)
         )
         return query.all()
 
