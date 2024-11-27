@@ -371,10 +371,18 @@ class Bot:
             return data['text']['body']  # Default to standard text message
 
     def parse_number(self, number):
-        """Parses and modifies phone number if it starts with a specific prefix."""
+        """
+        Parses and modifies a phone number:
+        - If it starts with '549', strips the '9' while keeping the rest.
+        - If it does not start with '+54', prepends '+54'.
+        """
         if number.startswith("549"):
-            return number[:2] + number[3:]
-        return number
+            # Convert '549...' to '+54...'
+            return f"+54{number[3:]}"
+        elif not number.startswith("+54"):
+            # Add '+54' if not already present
+            return f"+54{number.lstrip('0')}"  # Strip leading zeroes for consistency
+        return number  # Return unchanged if already starts with '+54'
 
     def enviar_saludo(self, cliente: Cliente):
         """Sends a greeting message with product options."""
