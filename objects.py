@@ -47,15 +47,29 @@ class Cliente(db.Model):
 
     @staticmethod
     def obtener_por_celular(celular):
-        # Attempt to find the cliente with the given celular
+        """
+        Finds a cliente by celular, checking both the given celular and with '54' prefixed.
+        """
+        # Attempt to find the clienestte with the exact celular
         cliente = Cliente.query.filter_by(celular=celular).first()
         if cliente:
             return cliente
-        else:
-            # If not found, prepend "54" to celular and search again
-            celular_with_prefix = "54" + celular
-            return Cliente.query.filter_by(celular=celular_with_prefix).first()
 
+        # If not found, prepend "54" to the celular and search again
+        celular_with_prefix = f"54{celular}"
+        cliente = Cliente.query.filter_by(celular=celular_with_prefix).first()
+        if cliente:
+            return cliente
+
+        # If still not found, search for the celular assuming it might already have '54'
+        if celular.startswith("54"):
+            celular_without_prefix = celular[2:]  # Remove '54'
+            cliente = Cliente.query.filter_by(celular=celular_without_prefix).first()
+            if cliente:
+                return cliente
+
+        # Return None if no match is found
+        return None
 
     def get_balance(self):
         transactions = Transaction.get_by_client_id(self.id)
