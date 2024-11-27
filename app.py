@@ -355,13 +355,13 @@ def api_client_messages(whatsapp_id):
             .filter(
                 or_(
                     Mensaje.whatsapp_id == whatsapp_id,  # Exact match
-                    Mensaje.whatsapp_id.startswith("54")  # Starts with "54"
+                    Mensaje.whatsapp_id == f"54{whatsapp_id}"  # whatsapp_id prefixed with "54"
                 )
             )
             .limit(per_page)
             .offset(offset)
             .all()
-)
+        )
 
         # Check if more messages exist for pagination
         total_messages = db.session.query(Mensaje).filter_by(whatsapp_id=whatsapp_id).count()
