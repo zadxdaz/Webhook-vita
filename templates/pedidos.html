@@ -33,6 +33,20 @@
     <form id="hoja-ruta-form" action="{{ url_for('create_hoja_de_ruta') }}" method="POST">
         {{ form.hidden_tag() }}
 
+        <!-- Select All and Add to Existing Hoja de Ruta Buttons -->
+        <div class="mb-3">
+            <button type="button" id="select-all-btn" class="btn btn-secondary">Seleccionar Todos</button>
+            <div class="d-inline-block">
+                <select id="existing-hoja-select" name="existing_hoja_id" class="form-control d-inline-block">
+                    <option value="">Seleccionar Hoja de Ruta</option>
+                    {% for hoja in hojas_de_ruta %}
+                    <option value="{{ hoja.id }}">{{ hoja.id }}</option>
+                    {% endfor %}
+                </select>
+                <button type="button" id="add-to-hoja-btn" class="btn btn-success" disabled>Agregar a Hoja de Ruta</button>
+            </div>
+        </div>
+
         <!-- Orders table -->
         <div class="table-responsive">
             <table class="table table-bordered table-striped">
@@ -103,12 +117,59 @@
 
     // Enable "Create Hoja de Ruta" button based on selected Pedidos
     const createHojaBtn = document.getElementById('create-hoja-btn');
+    const addToHojaBtn = document.getElementById('add-to-hoja-btn');
+    const selectAllBtn = document.getElementById('select-all-btn');
     const checkboxes = document.querySelectorAll('.pedido-checkbox');
 
+    function updateButtons() {
+        const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+        createHojaBtn.disabled = !anyChecked;
+        addToHojaBtn.disabled = !anyChecked || !document.getElementById('existing-hoja-select').value;
+    }
+
     checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
-            createHojaBtn.disabled = !anyChecked;
+        checkbox.addEventListener('change', updateButtons);
+    });
+
+    // Select all pending orders
+    selectAllBtn.addEventListener('click', function () {
+        checkboxes.forEach(cb => {
+            if (!cb.disabled) cb.checked = true;
+        });
+        updateButtons();
+    });
+
+    // Enable "Add to Hoja de Ruta" button when a Hoja is selected
+    document.getElementById('existing-hoja-select').addEventListener('change', updateButtons);
+
+    // Handle adding selected Pedidos to an existing Hoja de Ruta
+    addToHojaBtn.addEventListener('click', function () {
+        const selectedPedidos = Array.from(checkboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+
+        const hojaId = document.getElementById('existing-hoja-select').value;
+
+        if (!hojaId || selectedPedidos.length === 0) {
+            alert('Selecciona una Hoja de Ruta y al menos un pedido.');
+            return;
+        }
+
+        fetch(`/hoja-de-ruta/${hojaId}/add-pedidos`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({ pedidos: selectedPedidos })
+        })
+        .then(response => {
+            if (response.ok) {
+                alert('Pedidos agregados a la Hoja de Ruta exitosamente.');
+                location.reload();
+            } else {
+                alert('Error al agregar pedidos a la Hoja de Ruta.');
+            }
         });
     });
 </script>

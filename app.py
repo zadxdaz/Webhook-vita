@@ -257,22 +257,34 @@ def eliminar_producto(id):
         producto.delete()
     return redirect(url_for('productos'), 302)
 
-@app.route('/pedidos', methods=['GET', 'POST'])
-@handle_db_error
+
+@app.route('/pedidos', methods=['GET'])
 def pedidos():
+    """
+    Renders the pedidos page with optional filters for state and search query.
+    Allows the user to see all pedidos and available hojas de ruta.
+    """
     form = EmptyForm()
-    state_filter = request.args.get('state', 'pendiente')  # Default to 'pendiente'
-    search_query = request.args.get('search', '').strip()  # Optional search query
-    
-    # Fetch pedidos based on the filters
-    pedidos = Pedido.get_vista(state=state_filter, search=search_query)
-    
-    # Get unique states for dropdown filter options
+    # Fetch all available hojas de ruta
+    hojas_de_ruta = HojaDeRuta.query.all()  # Query all the `Hojas de Ruta` from the database
+
+    # Fetch filters from request arguments
+    state_filter = request.args.get('state', '').strip()
+    search_query = request.args.get('search', '').strip()
+
+    # Base query for pedidos
+    pedidos = Pedido.get_vista(state=state_filter,search=search_query)
     all_states = Pedido.get_unique_states()
-    
-    return render_template('pedidos.html', pedidos=pedidos, form=form, 
-                           state_filter=state_filter, search_query=search_query,
-                           all_states=all_states), 200
+    # Pass `hojas_de_ruta` and `pedidos` to the template
+    return render_template(
+        'pedidos.html',
+        pedidos=pedidos,
+        hojas_de_ruta=hojas_de_ruta,
+        state_filter=state_filter,
+        search_query=search_query,
+        all_states=all_states,
+        form=form  # Example states
+    )
 
 @app.route('/nuevo_pedido', methods=['GET', 'POST'])
 @handle_db_error
@@ -684,6 +696,7 @@ def compute_route():
                 if result["results"]:
                     location = result["results"][0]["geometry"]["location"]
                     geocoded_locations.append({
+                        "address": address,
                         "latitude": location["lat"],
                         "longitude": location["lng"]
                     })
@@ -697,9 +710,9 @@ def compute_route():
 
         # Construct the payload for the Routes API
         payload = {
-            "origin": {"location": {"latLng": geocoded_locations[0]}},
-            "destination": {"location": {"latLng": geocoded_locations[-1]}},
-            "intermediates": [{"location": {"latLng": loc}} for loc in geocoded_locations[1:-1]],
+            "origin": {"location": {"latLng": {"latitude": geocoded_locations[0]["latitude"], "longitude": geocoded_locations[0]["longitude"]}}},
+            "destination": {"location": {"latLng": {"latitude": geocoded_locations[-1]["latitude"], "longitude": geocoded_locations[-1]["longitude"]}}},
+            "intermediates": [{"location": {"latLng": {"latitude": loc["latitude"], "longitude": loc["longitude"]}}} for loc in geocoded_locations[1:-1]],
             "travelMode": "DRIVE",
             "optimizeWaypointOrder": True
         }
@@ -721,7 +734,7 @@ def compute_route():
             if not encoded_polyline:
                 return jsonify({"error": "Failed to retrieve route polyline"}), 400
 
-           # Extract optimized order
+            # Extract optimized order
             optimized_order = data.get("routes", [{}])[0].get("optimizedIntermediateWaypointIndex", [])
 
             # Include the fixed origin and destination indices
@@ -741,11 +754,11 @@ def compute_route():
                     print(f"Invalid waypoint index: {waypoint_index}")
                     return jsonify({"error": f"Invalid waypoint index: {waypoint_index}"}), 400
 
-
-            # Return the polyline for frontend mapping
+            # Return the polyline and geocoded locations for frontend mapping
             return jsonify({
                 "success": "Route optimized and saved successfully",
-                "polyline": encoded_polyline
+                "polyline": encoded_polyline,
+                "locations": geocoded_locations  # Include geocoded locations
             }), 200
         else:
             print(response.text)
@@ -811,6 +824,95 @@ def optimize_hoja_de_ruta(hoja_id):
         print(response.text)
         return jsonify({"error": "Failed to optimize route", "details": response.json()}), response.status_code
 
+@app.route('/hoja-de-ruta/<int:hoja_id>/print', methods=['GET'])
+def print_hoja_de_ruta(hoja_id):
+    """
+    Render a printable version of the Hoja de Ruta.
+    """
+    # Fetch the Hoja de Ruta
+    hoja_de_ruta = HojaDeRuta.query.get(hoja_id)
+    if not hoja_de_ruta:
+        abort(404, description="Hoja de Ruta not found")
+
+    # Fetch all Pedidos in the Hoja de Ruta with joins
+    pedidos = db.session.query(
+        HojaDeRutaPedido.posicion,
+        Pedido.id.label("pedido_id"),
+        Cliente.nombre_completo.label("cliente"),
+        Producto.nombre.label("producto"),
+        Pedido.cantidad,
+        Cliente.direccion.label('ubicacion'),
+        Pedido.total,
+        HojaDeRutaPedido.estado
+    ).join(
+        Pedido, HojaDeRutaPedido.pedido_id == Pedido.id
+    ).join(
+        Cliente, Pedido.cliente_id == Cliente.id
+    ).join(
+        Producto, Pedido.producto_id == Producto.id
+    ).filter(
+        HojaDeRutaPedido.hoja_de_ruta_id == hoja_id
+    ).order_by(
+        HojaDeRutaPedido.posicion
+    ).all()
+
+    # Render the printable template
+    return render_template('hoja_de_ruta_print.html', hoja_de_ruta=hoja_de_ruta, pedidos=pedidos)
+
+
+
+
+@app.route('/hoja-de-ruta/<int:hoja_id>/add-pedidos', methods=['POST'])
+@login_required
+def add_pedidos_to_hoja(hoja_id):
+    """Add selected pedidos to an existing Hoja de Ruta."""
+    try:
+        # Fetch the Hoja de Ruta
+        hoja_de_ruta = HojaDeRuta.get_by_id(hoja_id)
+        if not hoja_de_ruta:
+            return jsonify({"error": "Hoja de Ruta not found"}), 404
+
+        # Parse the pedidos from the request body
+        data = request.get_json()
+        pedidos_ids = data.get("pedidos", [])
+
+        if not pedidos_ids:
+            return jsonify({"error": "No pedidos selected"}), 400
+
+        # Validate and add pedidos
+        for pedido_id in pedidos_ids:
+            pedido = Pedido.get_by_id(pedido_id)
+            if not pedido:
+                return jsonify({"error": f"Pedido {pedido_id} not found"}), 404
+
+            if pedido.estado != "pendiente":
+                return jsonify({"error": f"Pedido {pedido_id} is not in 'pendiente' state"}), 400
+
+            # Check if the pedido is already in a Hoja de Ruta
+            existing_entry = HojaDeRutaPedido.query.filter_by(pedido_id=pedido_id).first()
+            if existing_entry:
+                return jsonify({"error": f"Pedido {pedido_id} is already assigned to a Hoja de Ruta"}), 400
+
+            # Add the pedido to the Hoja de Ruta
+            hoja_ruta_pedido = HojaDeRutaPedido(
+                hoja_de_ruta_id=hoja_id,
+                pedido_id=pedido_id,
+                estado="on delivery"  # Default state when added to Hoja de Ruta
+            )
+            db.session.add(hoja_ruta_pedido)
+
+            # Update the pedido's state
+            pedido.estado = "on delivery"
+            db.session.add(pedido)
+
+        # Commit changes
+        db.session.commit()
+        return jsonify({"success": "Pedidos added to Hoja de Ruta successfully"}), 200
+
+    except Exception as e:
+        print(f"Error adding pedidos to Hoja de Ruta: {e}")
+        db.session.rollback()
+        return jsonify({"error": "Internal Server Error"}), 500
 
 # Run the app with SSH tunnel
 if __name__ == '__main__':

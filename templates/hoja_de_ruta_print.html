@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hoja de Ruta #{{ hoja_de_ruta.id }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        table th {
+            background-color: #f2f2f2;
+        }
+        .print-button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+        }
+        .print-button:hover {
+            background-color: #0056b3;
+        }
+        @media print {
+            .print-button {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Hoja de Ruta #{{ hoja_de_ruta.id }}</h1>
+    <p><strong>Fecha:</strong> {{ hoja_de_ruta.fecha }}</p>
+    <p><strong>Estado:</strong> {{ hoja_de_ruta.estado }}</p>
+
+    <h2>Pedidos</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Cliente</th>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Dirección</th>
+                <th>Total $</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pedido in pedidos %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ pedido.cliente }}</td>
+                <td>{{ pedido.producto }}</td>
+                <td>{{ pedido.cantidad }}</td>
+                <td>{{ pedido.ubicacion }}</td>
+                <td>{{ pedido.total}}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Print Button -->
+    <button class="print-button" onclick="window.print()">Imprimir Hoja de Ruta</button>
+</body>
+</html>

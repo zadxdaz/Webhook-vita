@@ -7,32 +7,32 @@
     <h1 class="mb-4">Hoja de Ruta #{{ hoja_de_ruta.id }}</h1>
     <p><strong>Fecha:</strong> {{ hoja_de_ruta.fecha }}</p>
     <p><strong>Estado:</strong> {{ hoja_de_ruta.estado }}</p>
-
+    <a href="{{ url_for('print_hoja_de_ruta', hoja_id=hoja_de_ruta.id) }}" class="btn btn-secondary mt-3">Imprimir Hoja de Ruta</a>
 
 
     <!-- Drag-and-Drop Table -->
     <div class="table-responsive">
-            <table id="reorder-table" class="table table-bordered table-striped">
-                <thead class="thead-light">
-                    <tr>
-                        <th>ID Pedido</th>
-                        <th>Cliente</th>
-                        <th>Producto</th>
-                        <th>Cantidad</th>
-                        <th>Ubicación</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for pedido in pedidos %}
-                    <tr data-id="{{ pedido.pedido_id }}">
-                        <td>{{ pedido.pedido_id }}</td>
-                        <td>{{ pedido.cliente }}</td>
-                        <td>{{ pedido.producto }}</td>
-                        <td>{{ pedido.cantidad }}</td>
-                        <td>{{ pedido.ubicacion }}</td>
-                        <td>{{ pedido.estado }}</td>
-                        <td>
+        <table id="reorder-table" class="table table-bordered table-striped">
+            <thead class="thead-light">
+                <tr>
+                    <th>ID Pedido</th>
+                    <th>Cliente</th>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Ubicación</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pedido in pedidos %}
+                <tr data-id="{{ pedido.pedido_id }}">
+                    <td>{{ pedido.pedido_id }}</td>
+                    <td>{{ pedido.cliente }}</td>
+                    <td>{{ pedido.producto }}</td>
+                    <td>{{ pedido.cantidad }}</td>
+                    <td>{{ pedido.ubicacion }}</td>
+                    <td>{{ pedido.estado }}</td>
+                    <td>
                         {% if pedido.estado == 'on delivery' %}
                         <form action="{{ url_for('view_hoja_de_ruta', hoja_id=hoja_de_ruta.id) }}" method="POST" style="display:inline;">
                             {{ form.hidden_tag() }}
@@ -42,12 +42,11 @@
                         </form>
                         {% endif %}
                     </td>
-                    </tr>
-                    
-                    {% endfor %}
-                </tbody>
-            </table>
-            <button id="save-order-btn" class="btn btn-primary mt-3">Save Order</button>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button id="save-order-btn" class="btn btn-primary mt-3">Save Order</button>
     </div>
 
     <!-- Map Section -->
@@ -62,38 +61,36 @@
 <script src="https://maps.googleapis.com/maps/api/js?key={{ config.GOOGLE_MAPS_API_KEY }}&libraries=geometry"></script>
 
 <script>
-        const addresses = {{ addresses|tojson }};
-    if (addresses.length === 0) {
-        alert("No addresses available for this route.");
-    }
+    const addresses = {{ addresses|tojson }};
     const apiKey = "{{ config.GOOGLE_MAPS_API_KEY }}";
 
     function initializeMap() {
-    if (!addresses || addresses.length < 2) {
-        alert("Se requieren al menos dos direcciones para mostrar la ruta.");
-        return;
-    }
+        if (!addresses || addresses.length < 2) {
+            alert("Se requieren al menos dos direcciones para mostrar la ruta.");
+            return;
+        }
 
-    // Initialize the map
-    const map = new google.maps.Map(document.getElementById('map'), {
-        zoom: 10,
-        center: { lat: -34.603684, lng: -58.381559 } // Adjust default location
-    });
+        // Initialize the map
+        const map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 10,
+            center: { lat: -34.603684, lng: -58.381559 } // Adjust default location
+        });
 
-    // Call the backend to compute the route
-    fetch('/api/compute_route', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-            addresses, 
-            hoja_id: {{ hoja_de_ruta.id }} 
+        // Call the backend to compute the route
+        fetch('/api/compute_route', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                addresses, 
+                hoja_id: {{ hoja_de_ruta.id }} 
+            })
         })
-    })
         .then(response => response.json())
         .then(data => {
-            if (data.polyline) {
+            if (data.polyline && data.locations) {
+                // Plot the route on the map
                 const path = google.maps.geometry.encoding.decodePath(data.polyline);
                 const polyline = new google.maps.Polyline({
                     path,
@@ -104,10 +101,29 @@
                 });
                 polyline.setMap(map);
 
-                // Adjust map to fit the route
+                // Adjust map bounds to fit the route
                 const bounds = new google.maps.LatLngBounds();
                 path.forEach(latLng => bounds.extend(latLng));
                 map.fitBounds(bounds);
+
+                // Add pins for each location
+                data.locations.forEach(location => {
+                    const marker = new google.maps.Marker({
+                        position: { lat: location.latitude, lng: location.longitude },
+                        map: map,
+                        title: location.address,
+                        label: (data.locations.indexOf(location) + 1).toString()
+                    });
+
+                    // Info window for each marker
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: `<strong>Dirección:</strong> ${location.address}`
+                    });
+
+                    marker.addListener("click", () => {
+                        infoWindow.open(map, marker);
+                    });
+                });
             } else {
                 alert("No se pudo generar la ruta. Verifique las direcciones.");
                 console.error("Routes API Response:", data);
@@ -117,7 +133,7 @@
             console.error('Error fetching route:', err);
             alert("Error al generar la ruta. Intente nuevamente.");
         });
-}
+    }
 
     window.onload = initializeMap;
 </script>
@@ -126,28 +142,28 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
 <script>
     // Enable drag-and-drop reordering
-const table = document.getElementById('reorder-table');
-const sortable = new Sortable(table.querySelector('tbody'), {
-    animation: 150,
-});
+    const table = document.getElementById('reorder-table');
+    const sortable = new Sortable(table.querySelector('tbody'), {
+        animation: 150,
+    });
 
-// Handle button click to save the new order
-document.getElementById('save-order-btn').addEventListener('click', function () {
-    const rows = table.querySelectorAll('tbody tr');
-    const order = Array.from(rows).map(row => row.getAttribute('data-id'));
+    // Handle button click to save the new order
+    document.getElementById('save-order-btn').addEventListener('click', function () {
+        const rows = table.querySelectorAll('tbody tr');
+        const order = Array.from(rows).map(row => row.getAttribute('data-id'));
 
-    // Check if order array is valid
-    if (!order.length) {
-        alert('No items to reorder');
-        return;
-    }
+        // Check if order array is valid
+        if (!order.length) {
+            alert('No items to reorder');
+            return;
+        }
 
-    // Send the order to the backend
-    fetch(`/hoja-de-ruta/{{ hoja_de_ruta.id }}/reorder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order })
-    })
+        // Send the order to the backend
+        fetch(`/hoja-de-ruta/{{ hoja_de_ruta.id }}/reorder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order })
+        })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -162,8 +178,6 @@ document.getElementById('save-order-btn').addEventListener('click', function () 
             console.error('Error:', err);
             alert('An error occurred while updating the order. Please try again.');
         });
-});
-
-
+    });
 </script>
 {% endblock %}

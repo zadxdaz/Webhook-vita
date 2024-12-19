@@ -16,6 +16,11 @@
                 <h1>Mensajes del numero: {{ whatsapp_id }}</h1>
             </div>
             <div id="message-window" class="flex-grow-1 p-3 bg-light overflow-auto">
+                <!-- Loading Spinner -->
+                <div id="loading-spinner" class="text-center d-none">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Loading...
+                </div>
                 <table class="table table-borderless" id="message-table">
                     <tbody id="message-body">
                         <!-- Messages will be loaded here dynamically -->
@@ -45,7 +50,6 @@
 </div>
 
 <!-- Bootstrap and jQuery -->
-
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
@@ -55,29 +59,34 @@ var hasMore = true;
 var loadedMessageIds = [];
 
 // Function to load messages using AJAX
-function loadMessages() {
+function loadMessages(prepend = false) {
     if (!hasMore) return;
 
+    $('#loading-spinner').removeClass('d-none'); // Show spinner
     $.get(`/api/messages/${whatsapp_id}`, { page: page }, function (data) {
+        $('#loading-spinner').addClass('d-none'); // Hide spinner
         var messages = data.messages;
         page = data.page + 1;
         hasMore = data.has_more;
 
+        // Prepend messages if requested (infinite scroll loading)
         messages.forEach(function (message) {
             if (!loadedMessageIds.includes(message.id)) {
                 loadedMessageIds.push(message.id);
-                appendMessage(message);
+                if (prepend) {
+                    prependMessage(message);
+                } else {
+                    appendMessage(message);
+                }
             }
         });
 
-        if (!hasMore) {
-            $('#load-more-btn').hide();
-        } else {
-            $('#load-more-btn').show();
+        if (!hasMore && prepend) {
+            // Optional: Show a message if no more messages are available
+            $('#message-body').prepend('<tr><td class="text-center">No more messages</td></tr>');
         }
-
-        scrollToBottom();
     }).fail(function() {
+        $('#loading-spinner').addClass('d-none'); // Hide spinner
         alert("Failed to load messages!");
     });
 }
@@ -97,6 +106,29 @@ function appendMessage(message) {
         </tr>`
     );
 }
+
+// Helper function to prepend a message
+function prependMessage(message) {
+    var rowClass = message.direction === 'sent' ? 'text-right' : 'text-left';
+    var messageClass = message.direction === 'sent' ? 'bg-success text-white' : 'bg-white border';
+
+    $('#message-body').prepend(
+        `<tr>
+            <td class="${rowClass}">
+                <div class="p-2 rounded ${messageClass}" style="max-width: 70%; display: inline-block;">
+                    ${message.message}
+                </div>
+            </td>
+        </tr>`
+    );
+}
+
+// Attach scroll event listener for infinite scrolling
+$('#message-window').on('scroll', function () {
+    if ($(this).scrollTop() === 0 && hasMore) {
+        loadMessages(true); // Prepend older messages
+    }
+});
 
 // Send message via AJAX
 $('#send-message-btn').on('click', function () {
@@ -122,6 +154,7 @@ $('#send-message-btn').on('click', function () {
 // Load initial messages on page load
 $(document).ready(function () {
     loadMessages();
+    scrollToBottom();
 });
 
 // Poll for new messages every 5 seconds
@@ -145,4 +178,11 @@ function scrollToBottom() {
     $('#message-window').scrollTop($('#message-window')[0].scrollHeight);
 }
 </script>
+<style>
+    #message-window {
+        max-height: 500px; /* Constrain the message box size */
+        overflow-y: scroll; /* Enable vertical scrolling */
+        border: 1px solid #ddd; /* Optional: Add border for visibility */
+    }
+</style>
 {% endblock %}

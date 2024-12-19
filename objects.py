@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
+from typing import Optional
 from datetime import datetime
 from dotenv import load_dotenv
 import sshtunnel
@@ -382,21 +383,15 @@ class Bot:
         elif data['type'] == 'button':
             return data['button']['text']
         else:
-            return data['text']['body']  # Default to standard text message
+            return data['text']['body']
 
     def parse_number(self, number):
-        """
-        Parses and modifies a phone number:
-        - If it starts with '549', strips the '9' while keeping the rest.
-        - If it does not start with '+54', prepends '+54'.
-        """
+        """Parses and modifies a phone number."""
         if number.startswith("549"):
-            # Convert '549...' to '+54...'
             return f"54{number[3:]}"
         elif not number.startswith("54"):
-            # Add '+54' if not already present
-            return f"54{number.lstrip('0')}"  # Strip leading zeroes for consistency
-        return number  # Return unchanged if already starts with '+54'
+            return f"54{number.lstrip('0')}"
+        return number
 
     def enviar_saludo(self, cliente: Cliente):
         """Sends a greeting message with product options."""
@@ -441,9 +436,7 @@ class Bot:
             "messaging_product": "whatsapp",
             "to": celular,
             "type": "text",
-            "text": {
-                "body": mensaje
-            }
+            "text": {"body": mensaje}
         }
         timestamp = int(time.time())
         try:
@@ -466,15 +459,42 @@ class Bot:
             print(f"HTTP Request failed: {e}")
             return None
 
+    def enviar_botones(self, celular, texto, botones):
+        """Send interactive buttons to the user."""
+        url = f"https://graph.facebook.com/v20.0/{self.phone_number_id}/messages"
+        data = {
+            "messaging_product": "whatsapp",
+            "to": celular,
+            "type": "interactive",
+            "interactive": {
+                "type": "button",
+                "body": {"text": texto},
+                "action": {
+                    "buttons": [
+                        {"type": "reply", "reply": {"id": f"btn_{boton.lower()}", "title": boton}}
+                        for boton in botones
+                    ]
+                }
+            }
+        }
+        try:
+            response = requests.post(url, headers=self.headers, json=data)
+            if response.status_code != 200:
+                print(f"Error: {response.status_code} - {response.text}")
+            return response.json()
+        except requests.RequestException as e:
+            print(f"HTTP Request failed: {e}")
+            return None
+
     def procesar_mensaje(self, data):
         """Processes received message data and performs actions based on conversation state."""
         if 'messages' in data['entry'][0]['changes'][0]['value']:
             message_data = data['entry'][0]['changes'][0]['value']['messages'][0]
             phone_number = self.parse_number(message_data['from'])
             message_text = self.parse_text(message_data)
-            timestamp = int(message_data['timestamp'])
 
             # Log the received message
+            timestamp = int(message_data['timestamp'])
             message = Mensaje(
                 whatsapp_id=phone_number,
                 message=message_text,
@@ -484,43 +504,78 @@ class Bot:
             )
             db.session.add(message)
             db.session.commit()
+
             print(f"Received message from {phone_number}: {message_text}")
-            
+
             cliente = Cliente.obtener_por_celular(phone_number)
             if cliente:
                 if cliente.estado_conversacion == "esperando_producto":
                     producto = Producto.get_by_nombre(message_text)
                     if producto:
-                        self.preguntar_cantidad(cliente, message_text)
+                        self.preguntar_cantidad(cliente, producto)
                     else:
-                        self.enviar_mensaje(phone_number,"Producto incorrecto")
+                        self.enviar_producto_opciones(cliente)
                 elif cliente.estado_conversacion == "esperando_cantidad":
-                    self.confirmar_pedido(cliente, message_text)
+                    if message_text.isdigit() and int(message_text) > 0:
+                        self.confirmar_pedido(cliente, int(message_text))
+                        self.preguntar_otro_pedido(cliente)
+                    else:
+                        self.enviar_mensaje(phone_number, "Por favor ingresa una cantidad válida.")
+                elif cliente.estado_conversacion == "esperando_otro_pedido":
+                    if "si" in message_text.lower():  # Check if 'Yes' button pressed
+                        self.pedir_producto(cliente)
+                    elif "no" in message_text.lower():  # Check if 'No' button pressed
+                        self.enviar_mensaje(phone_number, "Gracias por tu pedido. ¡Que tengas un excelente día!")
+                        cliente.estado_conversacion = None
+                        db.session.commit()
+                    else:
+                        self.enviar_producto_opciones(cliente)
 
-    def preguntar_cantidad(self, cliente: Cliente, producto_nombre):
-        """Prompts the client to specify a quantity for the selected product."""
-        producto = Producto.get_by_nombre(producto_nombre)
-        if producto:
-            cliente.producto_seleccionado = producto.id
-            cliente.estado_conversacion = "esperando_cantidad"
-            db.session.commit()
+    def preguntar_cantidad(self, cliente: Cliente, producto: Producto):
+        """Prompts the client for the quantity of a selected product."""
+        cliente.producto_seleccionado = producto.id
+        cliente.estado_conversacion = "esperando_cantidad"
+        db.session.commit()
 
-            mensaje = f"¿Cuántos {producto.nombre} te gustaría ordenar?"
-            print(mensaje)
-            self.enviar_mensaje(cliente.celular, mensaje)
+        mensaje = f"¿Cuántos {producto.nombre} te gustaría ordenar?"
+        self.enviar_mensaje(cliente.celular, mensaje)
 
     def confirmar_pedido(self, cliente: Cliente, cantidad):
         """Creates an order, saves it to the database, and confirms with the client."""
         try:
-            pedido = Pedido(cliente_id=cliente.id, producto_id=cliente.producto_seleccionado, cantidad=int(cantidad))
+            producto = Producto.get_by_id(cliente.producto_seleccionado)
+            pedido = Pedido(cliente_id=cliente.id, producto_id=producto.id, cantidad=cantidad)
             pedido.calculate_total()
-            producto = Producto.get_by_id(pedido.producto_id)
             db.session.add(pedido)
+            db.session.commit()
+
             mensaje = f"Gracias {cliente.nombre_completo}, tu pedido de {cantidad} {producto.nombre}(s) ha sido registrado."
             self.enviar_mensaje(cliente.celular, mensaje)
-            cliente.estado_conversacion = None
-            cliente.producto_seleccionado = None
-            db.session.commit()
         except ValueError as e:
             print(f"Error processing quantity: {e}")
             self.enviar_mensaje(cliente.celular, "Hubo un error procesando tu cantidad, intenta de nuevo.")
+
+    def preguntar_otro_pedido(self, cliente: Cliente):
+        """Asks the user if they want to place another order using interactive buttons."""
+        cliente.estado_conversacion = "esperando_otro_pedido"
+        db.session.commit()
+
+        texto = "¿Te gustaría ordenar otro producto?"
+        botones = ["Si", "No"]
+        self.enviar_botones(cliente.celular, texto, botones)
+
+    def pedir_producto(self, cliente: Cliente):
+        """Asks the client to select a product using interactive buttons."""
+        botones = ["Bidón de 20 Litros", "Bidón de 12 Litros", "Cajón de Soda"]
+
+        texto = "Por favor elija su producto:"
+        cliente.estado_conversacion = "esperando_producto"
+        db.session.commit()
+
+        self.enviar_botones(cliente.celular, texto, botones)
+
+    def enviar_producto_opciones(self, cliente: Cliente):
+        """Sends 'Por favor selecciona una opción válida.' along with product buttons."""
+        texto = "Por favor selecciona una opción válida:"
+        botones = ["Bidón de 20 Litros", "Bidón de 12 Litros", "Cajón de Soda"]
+        self.enviar_botones(cliente.celular, texto, botones)
